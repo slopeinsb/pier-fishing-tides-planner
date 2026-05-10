@@ -374,6 +374,19 @@ function confidenceLabel(score) {
   return "Low";
 }
 
+function baitfishLabel(score) {
+  if (score >= 80) {
+    return "Hot";
+  }
+  if (score >= 65) {
+    return "Good";
+  }
+  if (score >= 50) {
+    return "Fair";
+  }
+  return "Slow";
+}
+
 function averageSeriesValue(entries, rangeStart, rangeEnd) {
   const matches = entries.filter((entry) => {
     const start = parseDateValue(entry.start);
@@ -464,6 +477,71 @@ function scoreLight(sunriseOverlapMinutes, sunsetOverlapMinutes) {
   return 0;
 }
 
+function computeBaitfishIndex(recommendation) {
+  let score = 35;
+
+  if (recommendation.lightScore >= 10) {
+    score += 20;
+  } else if (recommendation.lightScore >= 6) {
+    score += 12;
+  }
+
+  if (recommendation.averageSwing >= 2) {
+    score += 18;
+  } else if (recommendation.averageSwing >= 1.2) {
+    score += 10;
+  }
+
+  if (recommendation.conditions.windSpeedMph !== null && recommendation.conditions.windSpeedMph <= 10) {
+    score += 14;
+  } else if (recommendation.conditions.windSpeedMph !== null && recommendation.conditions.windSpeedMph <= 15) {
+    score += 8;
+  }
+
+  if (recommendation.conditions.waveHeightFeet !== null && recommendation.conditions.waveHeightFeet <= 4) {
+    score += 13;
+  } else if (recommendation.conditions.waveHeightFeet !== null && recommendation.conditions.waveHeightFeet <= 5.5) {
+    score += 7;
+  }
+
+  const finalScore = Math.min(100, Math.round(score));
+  return {
+    score: finalScore,
+    label: baitfishLabel(finalScore),
+  };
+}
+
+function inferTripType(recommendation) {
+  const topSpecies = recommendation.species || [];
+  const baitfishIndex = recommendation.baitfishIndex || computeBaitfishIndex(recommendation);
+
+  if (baitfishIndex.score >= 75) {
+    return {
+      label: "Baitfish Window",
+      detail: "Best for sabiki rigs, light baitfish action, and a fun mixed-family session.",
+    };
+  }
+
+  if (topSpecies.some((species) => species.key === "bat_ray" || species.key === "leopard_shark")) {
+    return {
+      label: "Soak Bait Session",
+      detail: "Better for longer bait soaks while waiting on rays or sharks.",
+    };
+  }
+
+  if (topSpecies.some((species) => species.key === "halibut")) {
+    return {
+      label: "Predator Window",
+      detail: "Better for live bait or artificials around cleaner, calmer water.",
+    };
+  }
+
+  return {
+    label: "Mixed Pier Session",
+    detail: "Good general-purpose family fishing window with a few species in play.",
+  };
+}
+
 function inferSpeciesForWindow(recommendation) {
   return SPECIES_PROFILES
     .map((profile) => {
@@ -546,6 +624,11 @@ function buildRecommendations(dayData, weatherSeries) {
       const waveScore = scoreWaveHeight(windowConditions.waveHeightFeet);
       const lightScore = scoreLight(windowConditions.sunriseOverlapMinutes, windowConditions.sunsetOverlapMinutes);
       const score = tideScore + windScore + waveScore + lightScore;
+      const baitfishIndex = computeBaitfishIndex({
+        averageSwing,
+        lightScore,
+        conditions: windowConditions,
+      });
       const species = inferSpeciesForWindow({
         highTime: parseDateValue(high.t),
         highHeight: high.numericValue,
@@ -560,6 +643,11 @@ function buildRecommendations(dayData, weatherSeries) {
         lightScore,
         score,
         conditions: windowConditions,
+        baitfishIndex,
+      });
+      const tripType = inferTripType({
+        species,
+        baitfishIndex,
       });
 
       return {
@@ -577,7 +665,9 @@ function buildRecommendations(dayData, weatherSeries) {
         score,
         rating: describeRating(score),
         conditions: windowConditions,
+        baitfishIndex,
         species,
+        tripType,
       };
     })
     .sort((left, right) => right.score - left.score);
@@ -620,6 +710,7 @@ function renderRecommendations(dayData, recommendations) {
     copy.textContent =
       `Centered on the ${formatDateTime(recommendation.highTime)} high tide. ` +
       `Most likely species: ${recommendation.species.map((species) => species.label).join(", ")}. ` +
+      `${recommendation.tripType.label}. ` +
       `Score breakdown: Tide ${recommendation.tideScore} + Wind ${recommendation.windScore} + Waves ${recommendation.waveScore} + Light ${recommendation.lightScore}.`;
 
     facts.append(
@@ -629,6 +720,8 @@ function renderRecommendations(dayData, recommendations) {
       createFact("Wind", `${toMph(recommendation.conditions.windSpeedMph)}${recommendation.conditions.windDirectionDegrees !== null ? ` ${degreesToCompass(recommendation.conditions.windDirectionDegrees)} (${Number(recommendation.conditions.windDirectionDegrees).toFixed(0)}°)` : ""}`),
       createFact("Wave height", toFeet(recommendation.conditions.waveHeightFeet)),
       createFact("Light window", lightWindow),
+      createFact("Baitfish index", `${recommendation.baitfishIndex.label} (${recommendation.baitfishIndex.score})`),
+      createFact("Trip type", recommendation.tripType.label),
       createFact("Low tide context", `Day's lowest low: ${toFeet(nearestLow)}`),
       createFact("Likely species", recommendation.species.map((species) => species.label).join(", ")),
       createFact("Why", recommendation.species[0].reasons.slice(0, 2).join(", ")),
@@ -644,6 +737,8 @@ function renderConditions(dayData, spot) {
   conditions.innerHTML = "";
   conditionsCaption.textContent = spot.notes;
   const daySpecies = dayData.daySpecies || [];
+  const baitfishIndex = dayData.dayBaitfishIndex;
+  const tripType = dayData.dayTripType;
 
   const sunNote =
     dayData.sunTimes.sunrise && dayData.sunTimes.sunset
@@ -677,6 +772,18 @@ function renderConditions(dayData, spot) {
       daySpecies.length
         ? `${daySpecies[0].label} leads with ${daySpecies[0].confidence.toLowerCase()} confidence. Best style: ${daySpecies[0].tripStyle}.`
         : "Pick a day with a stronger tide window to surface species guidance.",
+    ),
+    createConditionCard(
+      "Baitfish index",
+      baitfishIndex ? `${baitfishIndex.label} ${baitfishIndex.score}` : "Unavailable",
+      baitfishIndex
+        ? "Higher scores suggest better odds for sabiki-style action and a livelier mixed family trip."
+        : "Waiting on a clearer signal from the day's best window.",
+    ),
+    createConditionCard(
+      "Trip type",
+      tripType ? tripType.label : "Still evaluating",
+      tripType ? tripType.detail : "Trip style will appear once the day is scored.",
     ),
   );
 }
@@ -725,6 +832,8 @@ function renderSelectedDay(date) {
     ...dayData,
     recommendations,
     daySpecies: summarizeDaySpecies(recommendations),
+    dayBaitfishIndex: recommendations[0] ? recommendations[0].baitfishIndex : null,
+    dayTripType: recommendations[0] ? recommendations[0].tripType : null,
   };
   renderRecommendations(enrichedDay, recommendations);
   renderConditions(enrichedDay, PRESET_SPOTS[spotSelect.value]);
@@ -745,6 +854,8 @@ function renderWeek(spot, daysData) {
       ...dayData,
       recommendations,
       daySpecies: summarizeDaySpecies(recommendations),
+      dayBaitfishIndex: recommendations[0] ? recommendations[0].baitfishIndex : null,
+      dayTripType: recommendations[0] ? recommendations[0].tripType : null,
       bestScore: recommendations[0] ? recommendations[0].score : 0,
       bestWindow: recommendations[0] ? `${formatTime(recommendations[0].start)}-${formatTime(recommendations[0].end)}` : "No high tide window",
     };
@@ -768,7 +879,7 @@ function renderWeek(spot, daysData) {
     dateLabel.textContent = formatDayLabel(dayData.date);
     score.textContent = dayData.bestScore ? String(dayData.bestScore) : "0";
     note.textContent = dayData.bestScore
-      ? `${dayData.daySpecies.slice(0, 2).map((species) => species.label).join(", ")} • ${dayData.bestWindow}`
+      ? `${dayData.dayTripType ? dayData.dayTripType.label : dayData.daySpecies.slice(0, 2).map((species) => species.label).join(", ")} • ${dayData.bestWindow}`
       : "No strong high-tide block found";
 
     card.append(dateLabel, score, note);
