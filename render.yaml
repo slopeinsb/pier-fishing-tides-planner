@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: pier-fishing-companion
+    runtime: node
+    plan: free
+    buildCommand: echo "No build step required"
+    startCommand: node server.js

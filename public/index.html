@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pier Fishing Companion</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <section class="hero">
+        <p class="eyebrow">NOAA tide-based planning</p>
+        <h1>Pier Fishing Companion</h1>
+        <p class="lede">
+          Compare tide windows around Santa Barbara and Goleta, then pick the
+          strongest high-tide windows to make your family fishing trips easier
+          to plan.
+        </p>
+      </section>
+
+      <section class="panel controls">
+        <form id="planner-form">
+          <label>
+            Spot
+            <select id="spot" name="spot">
+              <option value="santa_barbara">Santa Barbara Harbor / City Pier</option>
+              <option value="goleta">Goleta Pier</option>
+            </select>
+          </label>
+
+          <label>
+            NOAA station ID
+            <input id="station" name="station" type="text" value="9411340" />
+          </label>
+
+          <label>
+            Start date
+            <input id="date" name="date" type="date" />
+          </label>
+
+          <button type="submit">Load 7-day plan</button>
+        </form>
+        <p class="hint">
+          Recommendations combine NOAA tides, NWS marine forecast conditions,
+          and sunrise/sunset timing. Tide stays the anchor, but wind, wave
+          height, and dawn/dusk now help sort the best family fishing windows
+          across the next week.
+        </p>
+      </section>
+
+      <section class="panel week-panel">
+        <div class="panel-header">
+          <h2>7-day outlook</h2>
+          <span id="week-status">Loading this week...</span>
+        </div>
+        <div id="week-grid" class="week-grid"></div>
+      </section>
+
+      <section class="grid">
+        <article class="panel" id="summary-panel">
+          <div class="panel-header">
+            <h2>Selected day</h2>
+            <span id="status">Choose a day from the week view.</span>
+          </div>
+          <div id="summary"></div>
+        </article>
+
+        <article class="panel">
+          <div class="panel-header">
+            <h2>Daily conditions</h2>
+            <span id="conditions-caption">Waiting for a date</span>
+          </div>
+          <div id="conditions" class="conditions"></div>
+        </article>
+      </section>
+
+      <section class="panel curve-panel">
+        <div class="panel-header">
+          <h2>Tide curve</h2>
+          <span>30-minute NOAA predictions</span>
+        </div>
+        <div id="chart" class="chart"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>How recommendations work</h2>
+        </div>
+        <ul class="rules">
+          <li>Start with a four-hour fishing block centered on each high tide.</li>
+          <li>Favor higher high tides compared with the rest of the day.</li>
+          <li>Favor bigger swings from nearby low tides because moving water often fishes better.</li>
+          <li>Reward calmer wind and manageable wave height using NWS forecast grids.</li>
+          <li>Add a bonus when a window overlaps the hour around sunrise or sunset.</li>
+          <li>Keep the NOAA station visible so you can validate whether a nearby pier is using the right reference point.</li>
+        </ul>
+      </section>
+    </main>
+
+    <template id="window-template">
+      <article class="window-card">
+        <div class="window-top">
+          <div>
+            <p class="window-label"></p>
+            <h3 class="window-title"></h3>
+          </div>
+          <div class="badge"></div>
+        </div>
+        <p class="window-copy"></p>
+        <dl class="facts"></dl>
+      </article>
+    </template>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

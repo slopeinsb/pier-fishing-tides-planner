@@ -1,0 +1,9 @@
+{
+  "name": "pier-fishing-companion",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fishing companion app for Santa Barbara and Goleta pier trips using NOAA tide predictions.",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
