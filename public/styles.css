@@ -186,6 +186,13 @@ button {
   line-height: 1.4;
 }
 
+.day-sun {
+  margin-top: 0.5rem;
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
 .grid {
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;

@@ -524,8 +524,8 @@ function inferTripType(recommendation) {
 
   if (topSpecies.some((species) => species.key === "bat_ray" || species.key === "leopard_shark")) {
     return {
-      label: "Soak Bait Session",
-      detail: "Better for longer bait soaks while waiting on rays or sharks.",
+      label: "Set-and-Wait Session",
+      detail: "Better for a longer, patient bait-fishing session while waiting on rays or sharks.",
     };
   }
 
@@ -868,6 +868,7 @@ function renderWeek(spot, daysData) {
     const dateLabel = document.createElement("p");
     const score = document.createElement("p");
     const note = document.createElement("p");
+    const sunLine = document.createElement("p");
 
     card.type = "button";
     card.className = "day-card";
@@ -875,14 +876,16 @@ function renderWeek(spot, daysData) {
     dateLabel.className = "day-date";
     score.className = "day-score";
     note.className = "day-note";
+    sunLine.className = "day-sun";
 
     dateLabel.textContent = formatDayLabel(dayData.date);
     score.textContent = dayData.bestScore ? String(dayData.bestScore) : "0";
     note.textContent = dayData.bestScore
       ? `${dayData.dayTripType ? dayData.dayTripType.label : dayData.daySpecies.slice(0, 2).map((species) => species.label).join(", ")} • ${dayData.bestWindow}`
       : "No strong high-tide block found";
+    sunLine.textContent = `Sunrise ${dayData.sunTimes.sunrise ? formatTime(dayData.sunTimes.sunrise) : "?"} • Sunset ${dayData.sunTimes.sunset ? formatTime(dayData.sunTimes.sunset) : "?"}`;
 
-    card.append(dateLabel, score, note);
+    card.append(dateLabel, score, note, sunLine);
     card.addEventListener("click", () => {
       renderSelectedDay(dayData.date);
     });
