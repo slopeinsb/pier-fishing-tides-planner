@@ -11,6 +11,7 @@ const WEATHER_BASE_URL = "https://api.weather.gov";
 const DEFAULT_TIME_ZONE = "lst_ldt";
 const WEATHER_USER_AGENT = "PierFishingCompanion/0.1 (local app)";
 const MINUTES_PER_DAY = 1440;
+const UPSTREAM_TIMEOUT_MS = 15000;
 
 const SPOTS = {
   santa_barbara: {
@@ -89,7 +90,9 @@ async function fetchNoaaJson(params) {
     ...params,
   });
 
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+  });
   if (!response.ok) {
     throw new Error(`NOAA request failed with ${response.status}`);
   }
@@ -104,6 +107,7 @@ async function fetchNoaaJson(params) {
 
 async function fetchWeatherJson(url) {
   const response = await fetch(url, {
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
     headers: {
       Accept: "application/geo+json",
       "User-Agent": WEATHER_USER_AGENT,
@@ -289,20 +293,25 @@ function overlapMinutes(rangeAStart, rangeAEnd, rangeBStart, rangeBEnd) {
 }
 
 async function fetchTideBundle(station, date) {
-  const compactDate = date.replaceAll("-", "");
+  return fetchTideRange(station, date, date);
+}
+
+async function fetchTideRange(station, beginDate, endDate) {
+  const compactBeginDate = beginDate.replaceAll("-", "");
+  const compactEndDate = endDate.replaceAll("-", "");
 
   const [highLowData, curveData] = await Promise.all([
     fetchNoaaJson({
-      begin_date: compactDate,
-      end_date: compactDate,
+      begin_date: compactBeginDate,
+      end_date: compactEndDate,
       datum: "MLLW",
       interval: "hilo",
       product: "predictions",
       station,
     }),
     fetchNoaaJson({
-      begin_date: compactDate,
-      end_date: compactDate,
+      begin_date: compactBeginDate,
+      end_date: compactEndDate,
       datum: "MLLW",
       interval: 30,
       product: "predictions",
@@ -314,6 +323,17 @@ async function fetchTideBundle(station, date) {
     highLowPredictions: highLowData.predictions || [],
     intervalPredictions: curveData.predictions || [],
   };
+}
+
+function groupPredictionsByDate(predictions) {
+  return (predictions || []).reduce((grouped, prediction) => {
+    const dateKey = String(prediction.t).slice(0, 10);
+    if (!grouped[dateKey]) {
+      grouped[dateKey] = [];
+    }
+    grouped[dateKey].push(prediction);
+    return grouped;
+  }, {});
 }
 
 async function fetchForecastGrid(latitude, longitude) {
@@ -470,31 +490,32 @@ async function handleWeekApi(requestUrl, response) {
 
   try {
     const forecast = await fetchForecastGrid(spot.latitude, spot.longitude);
+    const endDate = addDays(start, days - 1);
+    const tideRange = await fetchTideRange(spot.station, start, endDate);
     const weatherSeries = {
       windSpeedMph: serializeSeries(forecast.grid.windSpeed, kmhToMph),
       windDirectionDegrees: serializeSeries(forecast.grid.windDirection),
       waveHeightFeet: serializeSeries(forecast.grid.waveHeight, metersToFeet),
     };
+    const highLowByDate = groupPredictionsByDate(tideRange.highLowPredictions);
+    const intervalByDate = groupPredictionsByDate(tideRange.intervalPredictions);
 
-    const dayPayloads = await Promise.all(
-      Array.from({ length: days }, async (_, index) => {
-        const date = addDays(start, index);
-        const tides = await fetchTideBundle(spot.station, date);
-        const sunTimes = buildSunTimes(date, spot.latitude, spot.longitude);
+    const dayPayloads = Array.from({ length: days }, (_, index) => {
+      const date = addDays(start, index);
+      const sunTimes = buildSunTimes(date, spot.latitude, spot.longitude);
 
-        return {
-          date,
-          station: spot.station,
-          highLowPredictions: tides.highLowPredictions,
-          intervalPredictions: tides.intervalPredictions,
-          dailyConditions: buildDailyConditions(forecast.grid, date),
-          sunTimes: {
-            sunrise: sunTimes.sunrise ? toIsoWithOffset(sunTimes.sunrise) : null,
-            sunset: sunTimes.sunset ? toIsoWithOffset(sunTimes.sunset) : null,
-          },
-        };
-      }),
-    );
+      return {
+        date,
+        station: spot.station,
+        highLowPredictions: highLowByDate[date] || [],
+        intervalPredictions: intervalByDate[date] || [],
+        dailyConditions: buildDailyConditions(forecast.grid, date),
+        sunTimes: {
+          sunrise: sunTimes.sunrise ? toIsoWithOffset(sunTimes.sunrise) : null,
+          sunset: sunTimes.sunset ? toIsoWithOffset(sunTimes.sunset) : null,
+        },
+      };
+    });
 
     sendJson(response, 200, {
       spot,

@@ -122,6 +122,31 @@ button {
   gap: 0.8rem;
 }
 
+.loading-banner {
+  margin-bottom: 0.9rem;
+  padding: 0.85rem 1rem;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(14, 109, 120, 0.08);
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.loading-banner.loading {
+  background: rgba(14, 109, 120, 0.08);
+  border-color: rgba(14, 109, 120, 0.2);
+}
+
+.loading-banner.error {
+  background: rgba(149, 100, 32, 0.12);
+  border-color: rgba(149, 100, 32, 0.26);
+}
+
+.loading-banner.success {
+  background: rgba(47, 125, 75, 0.1);
+  border-color: rgba(47, 125, 75, 0.24);
+}
+
 .day-card {
   border: 1px solid var(--line);
   border-radius: 18px;

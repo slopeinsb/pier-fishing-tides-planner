@@ -9,6 +9,7 @@ const conditionsCaption = document.querySelector("#conditions-caption");
 const conditions = document.querySelector("#conditions");
 const weekGrid = document.querySelector("#week-grid");
 const weekStatus = document.querySelector("#week-status");
+const loadingBanner = document.querySelector("#loading-banner");
 const template = document.querySelector("#window-template");
 
 const PRESET_SPOTS = {
@@ -27,6 +28,7 @@ const PRESET_SPOTS = {
 let currentWeek = [];
 let currentWeatherSeries = {};
 let selectedDate = null;
+let currentRequestId = 0;
 
 function parseDateValue(value) {
   if (value instanceof Date) {
@@ -135,6 +137,24 @@ function createConditionCard(label, value, note) {
   cardNote.textContent = note;
   card.append(cardLabel, cardValue, cardNote);
   return card;
+}
+
+function setBanner(state, message) {
+  loadingBanner.hidden = !message;
+  loadingBanner.className = `loading-banner${state ? ` ${state}` : ""}`;
+  loadingBanner.textContent = message || "";
+}
+
+function setLoadingState(message) {
+  setBanner("loading", message);
+}
+
+function setSuccessState(message) {
+  setBanner("success", message);
+}
+
+function setErrorState(message) {
+  setBanner("error", message);
 }
 
 function averageSeriesValue(entries, rangeStart, rangeEnd) {
@@ -476,11 +496,19 @@ function renderWeek(spot, daysData) {
   }
 
   stationInput.value = spot.station;
+  setSuccessState(
+    bestDay
+      ? `Loaded ${daysData.length} days for ${spot.name}. Best current score: ${bestDay.bestScore} on ${formatDayLabel(bestDay.date)}.`
+      : `Loaded ${daysData.length} days for ${spot.name}, but no strong high-tide windows were found.`,
+  );
 }
 
 async function loadWeek(spot, startDate) {
+  const requestId = ++currentRequestId;
   statusLabel.textContent = "Loading 7-day fishing plan...";
   weekStatus.textContent = "Loading this week...";
+  conditionsCaption.textContent = "Waiting for forecast data";
+  setLoadingState("Fetching NOAA tides, NWS conditions, and sunrise/sunset for the next 7 days...");
   summary.innerHTML = "";
   conditions.innerHTML = "";
   chart.innerHTML = "";
@@ -490,13 +518,21 @@ async function loadWeek(spot, startDate) {
     const response = await fetch(`/api/week?spot=${encodeURIComponent(spot)}&start=${encodeURIComponent(startDate)}&days=7`);
     const data = await response.json();
 
+    if (requestId !== currentRequestId) {
+      return;
+    }
+
     if (!response.ok) {
-      throw new Error(data.error || "Unable to load weekly fishing conditions.");
+      throw new Error(data.detail ? `${data.error} ${data.detail}` : data.error || "Unable to load weekly fishing conditions.");
     }
 
     currentWeatherSeries = data.weatherSeries || {};
     renderWeek(data.spot, data.daysData || []);
   } catch (error) {
+    if (requestId !== currentRequestId) {
+      return;
+    }
+
     const emptyState = document.createElement("p");
     emptyState.className = "empty-state";
     emptyState.textContent = error.message;
@@ -505,6 +541,9 @@ async function loadWeek(spot, startDate) {
     statusLabel.textContent = "Unable to load conditions.";
     weekStatus.textContent = "No weekly forecast data available";
     conditionsCaption.textContent = "No forecast data available";
+    setErrorState(
+      `We couldn't finish loading the weekly plan. This usually means NOAA or NWS timed out, or Render couldn't reach them in time. Details: ${error.message}`,
+    );
   }
 }
 
