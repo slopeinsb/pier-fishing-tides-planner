@@ -1,6 +1,5 @@
 const plannerForm = document.querySelector("#planner-form");
 const spotSelect = document.querySelector("#spot");
-const stationInput = document.querySelector("#station");
 const dateInput = document.querySelector("#date");
 const summary = document.querySelector("#summary");
 const chart = document.querySelector("#chart");
@@ -10,6 +9,7 @@ const conditions = document.querySelector("#conditions");
 const weekGrid = document.querySelector("#week-grid");
 const weekStatus = document.querySelector("#week-status");
 const loadingBanner = document.querySelector("#loading-banner");
+const references = document.querySelector("#references");
 const template = document.querySelector("#window-template");
 
 const PRESET_SPOTS = {
@@ -346,6 +346,51 @@ function createConditionCard(label, value, note) {
   return card;
 }
 
+function createReferenceCard(title, description, url) {
+  const card = document.createElement("article");
+  const heading = document.createElement("h3");
+  const copy = document.createElement("p");
+
+  card.className = "reference-card";
+  heading.textContent = title;
+
+  if (url) {
+    const link = document.createElement("a");
+    link.href = url;
+    link.target = "_blank";
+    link.rel = "noreferrer";
+    link.textContent = url;
+    copy.append(`${description} `, link);
+  } else {
+    copy.textContent = description;
+  }
+
+  card.append(heading, copy);
+  return card;
+}
+
+function renderReferences(source, station) {
+  references.innerHTML = "";
+
+  references.append(
+    createReferenceCard(
+      "NOAA CO-OPS Tides",
+      `Tide predictions and 30-minute tide curve data come from NOAA CO-OPS. Station in use: ${station}.`,
+      source && source.tides ? source.tides : "https://api.tidesandcurrents.noaa.gov/api/prod/",
+    ),
+    createReferenceCard(
+      "National Weather Service API",
+      "Wind and wave-height conditions come from the National Weather Service forecast grid API.",
+      source && source.weather ? source.weather : "https://api.weather.gov",
+    ),
+    createReferenceCard(
+      "NOAA Solar Calculations",
+      "Sunrise and sunset are calculated locally using NOAA solar calculation formulas.",
+      "https://gml.noaa.gov/grad/solcalc/",
+    ),
+  );
+}
+
 function setBanner(state, message) {
   loadingBanner.hidden = !message;
   loadingBanner.className = `loading-banner${state ? ` ${state}` : ""}`;
@@ -375,13 +420,13 @@ function confidenceLabel(score) {
 }
 
 function baitfishLabel(score) {
-  if (score >= 80) {
+  if (score >= 92) {
     return "Hot";
   }
-  if (score >= 65) {
+  if (score >= 78) {
     return "Good";
   }
-  if (score >= 50) {
+  if (score >= 62) {
     return "Fair";
   }
   return "Slow";
@@ -866,7 +911,11 @@ function renderWeek(spot, daysData) {
   enrichedDays.forEach((dayData) => {
     const card = document.createElement("button");
     const dateLabel = document.createElement("p");
+    const scoreLabel = document.createElement("p");
     const score = document.createElement("p");
+    const meta = document.createElement("div");
+    const tripChip = document.createElement("span");
+    const baitfishChip = document.createElement("span");
     const note = document.createElement("p");
     const sunLine = document.createElement("p");
 
@@ -874,18 +923,26 @@ function renderWeek(spot, daysData) {
     card.className = "day-card";
     card.dataset.date = dayData.date;
     dateLabel.className = "day-date";
+    scoreLabel.className = "day-score-label";
     score.className = "day-score";
+    meta.className = "day-meta";
+    tripChip.className = "day-chip trip";
+    baitfishChip.className = "day-chip baitfish";
     note.className = "day-note";
     sunLine.className = "day-sun";
 
     dateLabel.textContent = formatDayLabel(dayData.date);
-    score.textContent = dayData.bestScore ? String(dayData.bestScore) : "0";
+    scoreLabel.textContent = "Fishing score";
+    score.textContent = dayData.bestScore ? `${dayData.bestScore}/100` : "0/100";
+    tripChip.textContent = `Trip: ${dayData.dayTripType ? dayData.dayTripType.label : "Mixed"}`;
+    baitfishChip.textContent = `Baitfish: ${dayData.dayBaitfishIndex ? dayData.dayBaitfishIndex.label : "N/A"}`;
     note.textContent = dayData.bestScore
-      ? `${dayData.dayTripType ? dayData.dayTripType.label : dayData.daySpecies.slice(0, 2).map((species) => species.label).join(", ")} • ${dayData.bestWindow}`
+      ? `Best window ${dayData.bestWindow}`
       : "No strong high-tide block found";
-    sunLine.textContent = `Sunrise ${dayData.sunTimes.sunrise ? formatTime(dayData.sunTimes.sunrise) : "?"} • Sunset ${dayData.sunTimes.sunset ? formatTime(dayData.sunTimes.sunset) : "?"}`;
+    sunLine.innerHTML = `☀ ${dayData.sunTimes.sunrise ? formatTime(dayData.sunTimes.sunrise) : "?"}<br />☾ ${dayData.sunTimes.sunset ? formatTime(dayData.sunTimes.sunset) : "?"}`;
+    meta.append(tripChip, baitfishChip);
 
-    card.append(dateLabel, score, note, sunLine);
+    card.append(dateLabel, scoreLabel, score, meta, note, sunLine);
     card.addEventListener("click", () => {
       renderSelectedDay(dayData.date);
     });
@@ -902,7 +959,6 @@ function renderWeek(spot, daysData) {
     renderSelectedDay(initialDate);
   }
 
-  stationInput.value = spot.station;
   setSuccessState(
     bestDay
       ? `Loaded ${daysData.length} days for ${spot.name}. Best current score: ${bestDay.bestScore} on ${formatDayLabel(bestDay.date)}.`
@@ -934,6 +990,7 @@ async function loadWeek(spot, startDate) {
     }
 
     currentWeatherSeries = data.weatherSeries || {};
+    renderReferences(data.source, data.station);
     renderWeek(data.spot, data.daysData || []);
   } catch (error) {
     if (requestId !== currentRequestId) {
@@ -948,6 +1005,7 @@ async function loadWeek(spot, startDate) {
     statusLabel.textContent = "Unable to load conditions.";
     weekStatus.textContent = "No weekly forecast data available";
     conditionsCaption.textContent = "No forecast data available";
+    renderReferences(null, PRESET_SPOTS[spot]?.station || "Unknown");
     setErrorState(
       `We couldn't finish loading the weekly plan. This usually means NOAA or NWS timed out, or Render couldn't reach them in time. Details: ${error.message}`,
     );
@@ -955,8 +1013,6 @@ async function loadWeek(spot, startDate) {
 }
 
 spotSelect.addEventListener("change", () => {
-  const preset = PRESET_SPOTS[spotSelect.value];
-  stationInput.value = preset ? preset.station : stationInput.value;
   loadWeek(spotSelect.value, dateInput.value);
 });
 
@@ -966,5 +1022,4 @@ plannerForm.addEventListener("submit", (event) => {
 });
 
 dateInput.value = formatDateForInput(new Date());
-stationInput.value = PRESET_SPOTS[spotSelect.value].station;
 loadWeek(spotSelect.value, dateInput.value);

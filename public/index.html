@@ -29,11 +29,6 @@
           </label>
 
           <label>
-            NOAA station ID
-            <input id="station" name="station" type="text" value="9411340" />
-          </label>
-
-          <label>
             Start date
             <input id="date" name="date" type="date" />
           </label>
@@ -83,7 +78,7 @@
         <div id="chart" class="chart"></div>
       </section>
 
-      <section class="panel">
+      <section class="panel guidance-panel">
         <div class="panel-header">
           <h2>How recommendations work</h2>
         </div>
@@ -96,6 +91,13 @@
           <li>Use those conditions to suggest the most likely species mix for each window.</li>
           <li>Keep the NOAA station visible so you can validate whether a nearby pier is using the right reference point.</li>
         </ul>
+      </section>
+
+      <section class="panel references-panel">
+        <div class="panel-header">
+          <h2>References</h2>
+        </div>
+        <div id="references" class="references"></div>
       </section>
     </main>
 

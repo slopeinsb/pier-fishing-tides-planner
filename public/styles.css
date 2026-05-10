@@ -1,16 +1,18 @@
 :root {
-  --bg: #f4efe4;
-  --ink: #15232d;
-  --muted: #566773;
-  --panel: rgba(255, 252, 247, 0.82);
-  --line: rgba(21, 35, 45, 0.12);
-  --sea: #0e6d78;
-  --sea-soft: #b8dde1;
-  --sand: #f0bb67;
+  --bg: #e8f2f4;
+  --ink: #12303d;
+  --muted: #517181;
+  --panel: rgba(248, 253, 255, 0.84);
+  --line: rgba(18, 48, 61, 0.12);
+  --sea: #0c6f88;
+  --sea-deep: #0a4e67;
+  --sea-soft: #b8e0e7;
+  --foam: #dff4f8;
+  --sand: #f0c67b;
   --good: #2f7d4b;
   --fair: #956420;
-  --excellent: #105c66;
-  --shadow: 0 18px 45px rgba(35, 44, 52, 0.12);
+  --excellent: #0c6274;
+  --shadow: 0 18px 45px rgba(17, 49, 63, 0.12);
 }
 
 * {
@@ -23,8 +25,9 @@ body {
   font-family: Georgia, "Times New Roman", serif;
   color: var(--ink);
   background:
-    radial-gradient(circle at top left, rgba(240, 187, 103, 0.45), transparent 30%),
-    linear-gradient(180deg, #d7ecef 0%, #f4efe4 42%, #efe5d4 100%);
+    radial-gradient(circle at top left, rgba(240, 198, 123, 0.3), transparent 24%),
+    radial-gradient(circle at top right, rgba(184, 224, 231, 0.55), transparent 28%),
+    linear-gradient(180deg, #d9eef3 0%, #e8f2f4 34%, #dcecf1 100%);
 }
 
 .shell {
@@ -72,7 +75,7 @@ h1 {
 
 form {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 1rem;
   align-items: end;
 }
@@ -99,7 +102,7 @@ select {
 
 button {
   border: none;
-  background: linear-gradient(135deg, var(--sea), #17465d);
+  background: linear-gradient(135deg, var(--sea), var(--sea-deep));
   color: white;
   font-weight: 700;
   cursor: pointer;
@@ -167,6 +170,13 @@ button {
   margin: 0;
 }
 
+.day-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.45rem;
+}
+
 .day-date {
   color: var(--muted);
   font-size: 0.85rem;
@@ -175,9 +185,18 @@ button {
 }
 
 .day-score {
-  margin-top: 0.45rem;
-  font-size: 2rem;
+  margin-top: 0.2rem;
+  font-size: 1.5rem;
   font-weight: 700;
+  color: var(--sea-deep);
+}
+
+.day-score-label {
+  margin-top: 0.45rem;
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 .day-note {
@@ -186,11 +205,36 @@ button {
   line-height: 1.4;
 }
 
+.day-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.day-chip.trip {
+  background: rgba(12, 111, 136, 0.12);
+  color: #0c5f73;
+}
+
+.day-chip.baitfish {
+  background: rgba(14, 111, 136, 0.16);
+  color: #0a5871;
+}
+
 .day-sun {
   margin-top: 0.5rem;
-  color: var(--ink);
-  font-size: 0.85rem;
+  display: inline-block;
+  padding: 0.35rem 0.6rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(240, 198, 123, 0.28), rgba(223, 244, 248, 0.9));
+  color: #6f4a11;
+  font-size: 0.8rem;
   font-weight: 700;
+  line-height: 1.35;
 }
 
 .grid {
@@ -310,6 +354,7 @@ button {
   align-items: end;
   gap: 4px;
   padding-top: 1rem;
+  padding-bottom: 2.25rem;
 }
 
 .conditions {
@@ -372,6 +417,42 @@ button {
   line-height: 1.6;
 }
 
+.references-panel {
+  margin-top: 1rem;
+  padding: 1.2rem;
+}
+
+.guidance-panel {
+  padding: 1.2rem;
+}
+
+.references {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.reference-card {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 0.95rem 1rem;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.reference-card h3,
+.reference-card p {
+  margin: 0;
+}
+
+.reference-card p {
+  margin-top: 0.35rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.reference-card a {
+  color: var(--sea-deep);
+}
+
 .empty-state {
   margin: 0;
   color: var(--muted);
@@ -394,7 +475,7 @@ button {
   .chart {
     height: 250px;
     overflow-x: auto;
-    padding-bottom: 2rem;
+    padding-bottom: 2.25rem;
   }
 
   .bar {
