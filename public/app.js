@@ -25,6 +25,213 @@ const PRESET_SPOTS = {
   },
 };
 
+const SPECIES_PROFILES = [
+  {
+    key: "mackerel",
+    label: "Mackerel",
+    tripStyle: "sabiki or bait around active water",
+    score(recommendation) {
+      let score = 46;
+      if (recommendation.lightScore >= 10) {
+        score += 18;
+      }
+      if (recommendation.averageSwing >= 2) {
+        score += 12;
+      }
+      if (recommendation.conditions.windSpeedMph !== null && recommendation.conditions.windSpeedMph <= 12) {
+        score += 8;
+      }
+      if (recommendation.conditions.waveHeightFeet !== null && recommendation.conditions.waveHeightFeet <= 4) {
+        score += 6;
+      }
+      return score;
+    },
+    reasons(recommendation) {
+      const reasons = [];
+      if (recommendation.lightScore >= 10) {
+        reasons.push("dawn or dusk overlap");
+      }
+      if (recommendation.averageSwing >= 2) {
+        reasons.push("active moving water");
+      }
+      if (recommendation.conditions.windSpeedMph !== null && recommendation.conditions.windSpeedMph <= 12) {
+        reasons.push("manageable wind for bait schools");
+      }
+      return reasons;
+    },
+  },
+  {
+    key: "jacksmelt",
+    label: "Jacksmelt",
+    tripStyle: "small baits under a float or light sabiki",
+    score(recommendation) {
+      let score = 44;
+      if (recommendation.conditions.windSpeedMph !== null && recommendation.conditions.windSpeedMph <= 10) {
+        score += 16;
+      }
+      if (recommendation.lightScore >= 6) {
+        score += 10;
+      }
+      if (recommendation.averageSwing >= 1.3) {
+        score += 8;
+      }
+      if (recommendation.conditions.waveHeightFeet !== null && recommendation.conditions.waveHeightFeet <= 3.5) {
+        score += 8;
+      }
+      return score;
+    },
+    reasons(recommendation) {
+      const reasons = [];
+      if (recommendation.conditions.windSpeedMph !== null && recommendation.conditions.windSpeedMph <= 10) {
+        reasons.push("calmer surface conditions");
+      }
+      if (recommendation.averageSwing >= 1.3) {
+        reasons.push("steady current");
+      }
+      if (recommendation.conditions.waveHeightFeet !== null && recommendation.conditions.waveHeightFeet <= 3.5) {
+        reasons.push("gentler water around the pier");
+      }
+      return reasons;
+    },
+  },
+  {
+    key: "surfperch",
+    label: "Surfperch",
+    tripStyle: "small bait or grubs when the water has some push",
+    score(recommendation) {
+      let score = 38;
+      if (recommendation.averageSwing >= 1.8) {
+        score += 14;
+      }
+      if (recommendation.conditions.waveHeightFeet !== null && recommendation.conditions.waveHeightFeet >= 1.5 && recommendation.conditions.waveHeightFeet <= 4.5) {
+        score += 18;
+      }
+      if (recommendation.lightScore >= 6) {
+        score += 8;
+      }
+      if (recommendation.conditions.windSpeedMph !== null && recommendation.conditions.windSpeedMph <= 14) {
+        score += 6;
+      }
+      return score;
+    },
+    reasons(recommendation) {
+      const reasons = [];
+      if (recommendation.averageSwing >= 1.8) {
+        reasons.push("good water movement");
+      }
+      if (recommendation.conditions.waveHeightFeet !== null && recommendation.conditions.waveHeightFeet >= 1.5 && recommendation.conditions.waveHeightFeet <= 4.5) {
+        reasons.push("enough surf energy to stir food");
+      }
+      if (recommendation.lightScore >= 6) {
+        reasons.push("lower-light edge");
+      }
+      return reasons;
+    },
+  },
+  {
+    key: "halibut",
+    label: "Halibut",
+    tripStyle: "live bait or artificials in cleaner, calmer windows",
+    score(recommendation) {
+      let score = 34;
+      if (recommendation.averageSwing >= 1.4 && recommendation.averageSwing <= 3.2) {
+        score += 14;
+      }
+      if (recommendation.conditions.windSpeedMph !== null && recommendation.conditions.windSpeedMph <= 9) {
+        score += 14;
+      }
+      if (recommendation.conditions.waveHeightFeet !== null && recommendation.conditions.waveHeightFeet <= 3) {
+        score += 16;
+      }
+      if (recommendation.lightScore >= 6) {
+        score += 6;
+      }
+      return score;
+    },
+    reasons(recommendation) {
+      const reasons = [];
+      if (recommendation.conditions.windSpeedMph !== null && recommendation.conditions.windSpeedMph <= 9) {
+        reasons.push("calmer presentation conditions");
+      }
+      if (recommendation.conditions.waveHeightFeet !== null && recommendation.conditions.waveHeightFeet <= 3) {
+        reasons.push("cleaner-looking water window");
+      }
+      if (recommendation.averageSwing >= 1.4 && recommendation.averageSwing <= 3.2) {
+        reasons.push("useful current without extreme turbulence");
+      }
+      return reasons;
+    },
+  },
+  {
+    key: "bat_ray",
+    label: "Bat Ray",
+    tripStyle: "soak bait through a stable, longer session",
+    score(recommendation) {
+      let score = 36;
+      if (recommendation.lightScore >= 6) {
+        score += 12;
+      }
+      if (recommendation.averageSwing >= 1.8) {
+        score += 14;
+      }
+      if (recommendation.conditions.windSpeedMph !== null && recommendation.conditions.windSpeedMph <= 16) {
+        score += 8;
+      }
+      if (recommendation.conditions.waveHeightFeet !== null && recommendation.conditions.waveHeightFeet <= 5) {
+        score += 6;
+      }
+      return score;
+    },
+    reasons(recommendation) {
+      const reasons = [];
+      if (recommendation.lightScore >= 6) {
+        reasons.push("low-light feeding window");
+      }
+      if (recommendation.averageSwing >= 1.8) {
+        reasons.push("good tide pull for scent dispersion");
+      }
+      if (recommendation.conditions.windSpeedMph !== null && recommendation.conditions.windSpeedMph <= 16) {
+        reasons.push("reasonable soaking conditions");
+      }
+      return reasons;
+    },
+  },
+  {
+    key: "leopard_shark",
+    label: "Leopard Shark",
+    tripStyle: "bait soak around calmer evening movement",
+    score(recommendation) {
+      let score = 34;
+      if (recommendation.lightScore >= 6) {
+        score += 14;
+      }
+      if (recommendation.averageSwing >= 1.5) {
+        score += 12;
+      }
+      if (recommendation.conditions.windSpeedMph !== null && recommendation.conditions.windSpeedMph <= 14) {
+        score += 10;
+      }
+      if (recommendation.conditions.waveHeightFeet !== null && recommendation.conditions.waveHeightFeet <= 4.5) {
+        score += 8;
+      }
+      return score;
+    },
+    reasons(recommendation) {
+      const reasons = [];
+      if (recommendation.lightScore >= 6) {
+        reasons.push("better low-light timing");
+      }
+      if (recommendation.averageSwing >= 1.5) {
+        reasons.push("enough current to move scent");
+      }
+      if (recommendation.conditions.waveHeightFeet !== null && recommendation.conditions.waveHeightFeet <= 4.5) {
+        reasons.push("more manageable pier water");
+      }
+      return reasons;
+    },
+  },
+];
+
 let currentWeek = [];
 let currentWeatherSeries = {};
 let selectedDate = null;
@@ -157,6 +364,16 @@ function setErrorState(message) {
   setBanner("error", message);
 }
 
+function confidenceLabel(score) {
+  if (score >= 78) {
+    return "High";
+  }
+  if (score >= 62) {
+    return "Medium";
+  }
+  return "Low";
+}
+
 function averageSeriesValue(entries, rangeStart, rangeEnd) {
   const matches = entries.filter((entry) => {
     const start = parseDateValue(entry.start);
@@ -247,6 +464,49 @@ function scoreLight(sunriseOverlapMinutes, sunsetOverlapMinutes) {
   return 0;
 }
 
+function inferSpeciesForWindow(recommendation) {
+  return SPECIES_PROFILES
+    .map((profile) => {
+      const score = Math.min(100, Math.round(profile.score(recommendation)));
+      const reasons = profile.reasons(recommendation);
+      return {
+        key: profile.key,
+        label: profile.label,
+        tripStyle: profile.tripStyle,
+        score,
+        confidence: confidenceLabel(score),
+        reasons: reasons.length ? reasons : ["overall conditions are decent for a mixed pier session"],
+      };
+    })
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 3);
+}
+
+function summarizeDaySpecies(recommendations) {
+  const totals = new Map();
+
+  recommendations.forEach((recommendation, index) => {
+    const weight = index === 0 ? 1 : 0.7;
+    (recommendation.species || []).forEach((species, speciesIndex) => {
+      const previous = totals.get(species.key) || {
+        ...species,
+        weightedScore: 0,
+      };
+      previous.weightedScore += species.score * weight * (speciesIndex === 0 ? 1 : 0.8);
+      totals.set(species.key, previous);
+    });
+  });
+
+  return Array.from(totals.values())
+    .sort((left, right) => right.weightedScore - left.weightedScore)
+    .slice(0, 3)
+    .map((species) => ({
+      ...species,
+      weightedScore: Math.round(species.weightedScore),
+      confidence: confidenceLabel(species.score),
+    }));
+}
+
 function buildRecommendations(dayData, weatherSeries) {
   const highLowPredictions = dayData.highLowPredictions || [];
   const highs = highLowPredictions
@@ -286,6 +546,21 @@ function buildRecommendations(dayData, weatherSeries) {
       const waveScore = scoreWaveHeight(windowConditions.waveHeightFeet);
       const lightScore = scoreLight(windowConditions.sunriseOverlapMinutes, windowConditions.sunsetOverlapMinutes);
       const score = tideScore + windScore + waveScore + lightScore;
+      const species = inferSpeciesForWindow({
+        highTime: parseDateValue(high.t),
+        highHeight: high.numericValue,
+        start,
+        end,
+        incomingSwing,
+        outgoingSwing,
+        averageSwing,
+        tideScore,
+        windScore,
+        waveScore,
+        lightScore,
+        score,
+        conditions: windowConditions,
+      });
 
       return {
         highTime: parseDateValue(high.t),
@@ -302,6 +577,7 @@ function buildRecommendations(dayData, weatherSeries) {
         score,
         rating: describeRating(score),
         conditions: windowConditions,
+        species,
       };
     })
     .sort((left, right) => right.score - left.score);
@@ -343,6 +619,7 @@ function renderRecommendations(dayData, recommendations) {
     badge.classList.add(recommendation.rating.className);
     copy.textContent =
       `Centered on the ${formatDateTime(recommendation.highTime)} high tide. ` +
+      `Most likely species: ${recommendation.species.map((species) => species.label).join(", ")}. ` +
       `Score breakdown: Tide ${recommendation.tideScore} + Wind ${recommendation.windScore} + Waves ${recommendation.waveScore} + Light ${recommendation.lightScore}.`;
 
     facts.append(
@@ -353,6 +630,8 @@ function renderRecommendations(dayData, recommendations) {
       createFact("Wave height", toFeet(recommendation.conditions.waveHeightFeet)),
       createFact("Light window", lightWindow),
       createFact("Low tide context", `Day's lowest low: ${toFeet(nearestLow)}`),
+      createFact("Likely species", recommendation.species.map((species) => species.label).join(", ")),
+      createFact("Why", recommendation.species[0].reasons.slice(0, 2).join(", ")),
       createFact("NOAA station", dayData.station),
       createFact("Window rule", "2 hours before and after high tide"),
     );
@@ -364,6 +643,7 @@ function renderRecommendations(dayData, recommendations) {
 function renderConditions(dayData, spot) {
   conditions.innerHTML = "";
   conditionsCaption.textContent = spot.notes;
+  const daySpecies = dayData.daySpecies || [];
 
   const sunNote =
     dayData.sunTimes.sunrise && dayData.sunTimes.sunset
@@ -390,6 +670,13 @@ function renderConditions(dayData, spot) {
       "Tide station",
       dayData.station,
       `${spot.name} is currently mapped to NOAA tide station ${dayData.station}.`,
+    ),
+    createConditionCard(
+      "Likely species today",
+      daySpecies.length ? daySpecies.map((species) => species.label).join(", ") : "Still evaluating",
+      daySpecies.length
+        ? `${daySpecies[0].label} leads with ${daySpecies[0].confidence.toLowerCase()} confidence. Best style: ${daySpecies[0].tripStyle}.`
+        : "Pick a day with a stronger tide window to surface species guidance.",
     ),
   );
 }
@@ -434,8 +721,13 @@ function renderSelectedDay(date) {
 
   selectedDate = date;
   const recommendations = buildRecommendations(dayData, currentWeatherSeries);
-  renderRecommendations(dayData, recommendations);
-  renderConditions(dayData, PRESET_SPOTS[spotSelect.value]);
+  const enrichedDay = {
+    ...dayData,
+    recommendations,
+    daySpecies: summarizeDaySpecies(recommendations),
+  };
+  renderRecommendations(enrichedDay, recommendations);
+  renderConditions(enrichedDay, PRESET_SPOTS[spotSelect.value]);
   renderChart(dayData.intervalPredictions || []);
   statusLabel.textContent = `${PRESET_SPOTS[spotSelect.value].name} on ${formatDayLabel(date)} using NOAA station ${dayData.station}.`;
 
@@ -452,6 +744,7 @@ function renderWeek(spot, daysData) {
     return {
       ...dayData,
       recommendations,
+      daySpecies: summarizeDaySpecies(recommendations),
       bestScore: recommendations[0] ? recommendations[0].score : 0,
       bestWindow: recommendations[0] ? `${formatTime(recommendations[0].start)}-${formatTime(recommendations[0].end)}` : "No high tide window",
     };
@@ -475,7 +768,7 @@ function renderWeek(spot, daysData) {
     dateLabel.textContent = formatDayLabel(dayData.date);
     score.textContent = dayData.bestScore ? String(dayData.bestScore) : "0";
     note.textContent = dayData.bestScore
-      ? `Best window ${dayData.bestWindow}`
+      ? `${dayData.daySpecies.slice(0, 2).map((species) => species.label).join(", ")} • ${dayData.bestWindow}`
       : "No strong high-tide block found";
 
     card.append(dateLabel, score, note);

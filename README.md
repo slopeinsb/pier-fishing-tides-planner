@@ -9,12 +9,14 @@ A small fishing-planning app for Santa Barbara and Goleta pier trips. It uses NO
 - Calculates sunrise and sunset locally for each pier location.
 - Preloads the current day plus the next 6 days so you can compare a full week at a glance.
 - Lets you click any day to inspect its best high-tide windows in detail.
+- Suggests the most likely species mix for each window and each day.
 - Ranks windows using:
   - high-tide height relative to the rest of the day
   - the size of the swing from nearby low tides
   - forecast wind conditions
   - forecast wave height as a first-pass swell/surf proxy
   - overlap with sunrise or sunset
+- Builds a first-pass species recommendation layer for mackerel, jacksmelt, surfperch, halibut, bat ray, and leopard shark.
 - Draws a simple 30-minute tide curve for quick visual scanning.
 
 ## Run it
@@ -77,5 +79,6 @@ This app is built around public NOAA and NWS services:
 
 - The default tide station is `9411340` for Santa Barbara. Goleta Pier currently reuses that nearby tide station while applying Goleta-specific weather and sunrise/sunset coordinates.
 - Wave height is coming from the NWS forecast grid as a practical first-pass swell/surf signal. A future refinement could use a more explicit nearshore swell model if you want a more fishing-specific surf read.
+- Species guidance is heuristic for now. It is meant to help decide whether a family trip looks promising, not to guarantee what will bite.
 - This version still has room to grow with species targets, moon phase, weather icons, safety thresholds, and personal trip constraints.
 - Tide timing alone is a useful shortcut, but it is still a heuristic rather than a guarantee of fishing success.
