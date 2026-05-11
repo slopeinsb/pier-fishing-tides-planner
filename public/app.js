@@ -587,6 +587,50 @@ function inferTripType(recommendation) {
   };
 }
 
+function recommendBait(daySpecies, tripType, baitfishIndex) {
+  const primary = daySpecies[0] ? daySpecies[0].key : null;
+
+  if (tripType && tripType.label === "Baitfish Window") {
+    return {
+      label: "Sabiki with bait tips",
+      detail: "Bring small sabiki rigs tipped with tiny pieces of squid for mackerel or jacksmelt style action.",
+    };
+  }
+
+  if (primary === "halibut") {
+    return {
+      label: "Live bait or soft plastics",
+      detail: "If available, try live baitfish. Otherwise bring swimbaits or flukes for a cleaner-water halibut window.",
+    };
+  }
+
+  if (primary === "bat_ray" || primary === "leopard_shark") {
+    return {
+      label: "Cut squid or oily cut bait",
+      detail: "A patient set-and-wait session is best with squid or other smelly cut bait left out for longer soaks.",
+    };
+  }
+
+  if (primary === "surfperch") {
+    return {
+      label: "Small natural bait",
+      detail: "Try shrimp pieces, sand-crab style bait, or small grubs when the water has some push.",
+    };
+  }
+
+  if (baitfishIndex && baitfishIndex.score >= 78) {
+    return {
+      label: "Small sabiki and squid strips",
+      detail: "The conditions look lively enough for baitfish, so bring small sabikis and a little squid for tipping hooks.",
+    };
+  }
+
+  return {
+    label: "Squid and shrimp",
+    detail: "For a general family session, squid and shrimp are the most flexible starting baits across several likely species.",
+  };
+}
+
 function inferSpeciesForWindow(recommendation) {
   return SPECIES_PROFILES
     .map((profile) => {
@@ -784,6 +828,7 @@ function renderConditions(dayData, spot) {
   const daySpecies = dayData.daySpecies || [];
   const baitfishIndex = dayData.dayBaitfishIndex;
   const tripType = dayData.dayTripType;
+  const baitRecommendation = dayData.baitRecommendation;
 
   const sunNote =
     dayData.sunTimes.sunrise && dayData.sunTimes.sunset
@@ -829,6 +874,11 @@ function renderConditions(dayData, spot) {
       "Trip type",
       tripType ? tripType.label : "Still evaluating",
       tripType ? tripType.detail : "Trip style will appear once the day is scored.",
+    ),
+    createConditionCard(
+      "Recommended bait",
+      baitRecommendation ? baitRecommendation.label : "Still evaluating",
+      baitRecommendation ? baitRecommendation.detail : "Bait guidance will appear once the day is scored.",
     ),
   );
 }
@@ -880,6 +930,7 @@ function renderSelectedDay(date) {
     dayBaitfishIndex: recommendations[0] ? recommendations[0].baitfishIndex : null,
     dayTripType: recommendations[0] ? recommendations[0].tripType : null,
   };
+  enrichedDay.baitRecommendation = recommendBait(enrichedDay.daySpecies, enrichedDay.dayTripType, enrichedDay.dayBaitfishIndex);
   renderRecommendations(enrichedDay, recommendations);
   renderConditions(enrichedDay, PRESET_SPOTS[spotSelect.value]);
   renderChart(dayData.intervalPredictions || []);
@@ -901,9 +952,14 @@ function renderWeek(spot, daysData) {
       daySpecies: summarizeDaySpecies(recommendations),
       dayBaitfishIndex: recommendations[0] ? recommendations[0].baitfishIndex : null,
       dayTripType: recommendations[0] ? recommendations[0].tripType : null,
+      baitRecommendation: null,
       bestScore: recommendations[0] ? recommendations[0].score : 0,
       bestWindow: recommendations[0] ? `${formatTime(recommendations[0].start)}-${formatTime(recommendations[0].end)}` : "No high tide window",
     };
+  });
+
+  enrichedDays.forEach((dayData) => {
+    dayData.baitRecommendation = recommendBait(dayData.daySpecies, dayData.dayTripType, dayData.dayBaitfishIndex);
   });
 
   currentWeek = enrichedDays;
