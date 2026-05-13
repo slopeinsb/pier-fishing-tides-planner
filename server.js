@@ -8,6 +8,7 @@ const HOST = process.env.HOST || (process.env.RENDER ? "0.0.0.0" : "127.0.0.1");
 const PUBLIC_DIR = path.join(__dirname, "public");
 const NOAA_BASE_URL = "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter";
 const WEATHER_BASE_URL = "https://api.weather.gov";
+const NDBC_BASE_URL = "https://www.ndbc.noaa.gov/data/realtime2";
 const DEFAULT_TIME_ZONE = "lst_ldt";
 const WEATHER_USER_AGENT = "PierFishingCompanion/0.1 (local app)";
 const MINUTES_PER_DAY = 1440;
@@ -18,6 +19,7 @@ const SPOTS = {
     id: "santa_barbara",
     name: "Santa Barbara Harbor / City Pier",
     station: "9411340",
+    buoyStation: "46053",
     latitude: 34.4046,
     longitude: -119.6925,
     notes: "Tides and nearby forecast conditions centered on Santa Barbara Harbor.",
@@ -26,6 +28,7 @@ const SPOTS = {
     id: "goleta",
     name: "Goleta Pier",
     station: "9411340",
+    buoyStation: "46053",
     latitude: 34.4139,
     longitude: -119.8296,
     notes: "Tides use the nearby Santa Barbara NOAA station while weather and light are centered on Goleta Pier.",
@@ -119,6 +122,21 @@ async function fetchWeatherJson(url) {
   }
 
   return response.json();
+}
+
+async function fetchPlainText(url) {
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    headers: {
+      "User-Agent": WEATHER_USER_AGENT,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Text request failed with ${response.status}`);
+  }
+
+  return response.text();
 }
 
 function getSpot(searchParams) {
@@ -336,6 +354,60 @@ function groupPredictionsByDate(predictions) {
   }, {});
 }
 
+function parseNdbcFixedWidthText(text) {
+  const lines = String(text).trim().split("\n").filter(Boolean);
+  if (lines.length < 3) {
+    return [];
+  }
+
+  const headers = lines[0].trim().split(/\s+/);
+  const dataLines = lines.slice(2);
+
+  return dataLines.map((line) => {
+    const parts = line.trim().split(/\s+/);
+    const entry = {};
+    headers.forEach((header, index) => {
+      entry[header] = parts[index];
+    });
+    return entry;
+  });
+}
+
+function parseNdbcNumber(value) {
+  if (value === undefined || value === null || value === "MM") {
+    return null;
+  }
+
+  const numeric = Number(value);
+  return Number.isNaN(numeric) ? null : numeric;
+}
+
+async function fetchBuoyConditions(stationId) {
+  const [metText, specText] = await Promise.all([
+    fetchPlainText(`${NDBC_BASE_URL}/${stationId}.txt`),
+    fetchPlainText(`${NDBC_BASE_URL}/${stationId}.spec`),
+  ]);
+
+  const metRows = parseNdbcFixedWidthText(metText);
+  const specRows = parseNdbcFixedWidthText(specText);
+  const met = metRows[0] || {};
+  const spec = specRows[0] || {};
+
+  const waterTempF = parseNdbcNumber(met.WTMP);
+  const dominantPeriodSeconds = parseNdbcNumber(spec.DPD);
+  const meanWaveDirectionDegrees = parseNdbcNumber(spec.MWD);
+  const significantWaveHeightMeters = parseNdbcNumber(spec.WVHT);
+
+  return {
+    stationId,
+    observedAtUtc: met["#YY"] ? `${met["#YY"]}-${met.MM}-${met.DD}T${met.hh}:${met.mm}:00Z` : null,
+    waterTempF,
+    dominantPeriodSeconds,
+    meanWaveDirectionDegrees,
+    significantWaveHeightFeet: significantWaveHeightMeters === null ? null : metersToFeet(significantWaveHeightMeters),
+  };
+}
+
 async function fetchForecastGrid(latitude, longitude) {
   const pointsUrl = buildUrl(`${WEATHER_BASE_URL}/points/${latitude},${longitude}`, {});
   const pointsData = await fetchWeatherJson(pointsUrl);
@@ -489,7 +561,10 @@ async function handleWeekApi(requestUrl, response) {
   }
 
   try {
-    const forecast = await fetchForecastGrid(spot.latitude, spot.longitude);
+    const [forecast, buoyConditions] = await Promise.all([
+      fetchForecastGrid(spot.latitude, spot.longitude),
+      fetchBuoyConditions(spot.buoyStation),
+    ]);
     const endDate = addDays(start, days - 1);
     const tideRange = await fetchTideRange(spot.station, start, endDate);
     const weatherSeries = {
@@ -510,6 +585,7 @@ async function handleWeekApi(requestUrl, response) {
         highLowPredictions: highLowByDate[date] || [],
         intervalPredictions: intervalByDate[date] || [],
         dailyConditions: buildDailyConditions(forecast.grid, date),
+        buoyConditions,
         sunTimes: {
           sunrise: sunTimes.sunrise ? toIsoWithOffset(sunTimes.sunrise) : null,
           sunset: sunTimes.sunset ? toIsoWithOffset(sunTimes.sunset) : null,
@@ -526,6 +602,7 @@ async function handleWeekApi(requestUrl, response) {
       source: {
         tides: "https://api.tidesandcurrents.noaa.gov/api/prod/",
         weather: "https://api.weather.gov",
+        buoy: `https://www.ndbc.noaa.gov/station_page.php?station=${spot.buoyStation}`,
         sunriseSunset: "Calculated locally using NOAA solar calculation formulas.",
       },
       forecastMeta: {

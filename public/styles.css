@@ -191,14 +191,6 @@ button {
   color: var(--sea-deep);
 }
 
-.day-score-label {
-  margin-top: 0.45rem;
-  color: var(--muted);
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
 .day-note {
   margin-top: 0.35rem;
   color: var(--muted);
@@ -221,8 +213,8 @@ button {
 }
 
 .day-chip.baitfish {
-  background: rgba(14, 111, 136, 0.16);
-  color: #0a5871;
+  background: rgba(240, 198, 123, 0.24);
+  color: #7a5714;
 }
 
 .day-sun {
@@ -234,6 +226,13 @@ button {
   color: #6f4a11;
   font-size: 0.8rem;
   font-weight: 700;
+  line-height: 1.35;
+}
+
+.day-window {
+  margin-top: 0.45rem;
+  color: var(--muted);
+  font-size: 0.84rem;
   line-height: 1.35;
 }
 
@@ -266,6 +265,120 @@ button {
 #summary {
   display: grid;
   gap: 0.9rem;
+}
+
+.day-bait {
+  margin-bottom: 1rem;
+  padding: 0.95rem 1rem;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(12, 111, 136, 0.12), rgba(240, 198, 123, 0.2));
+  border: 1px solid var(--line);
+}
+
+.day-bait strong,
+.day-bait span {
+  display: block;
+}
+
+.day-bait strong {
+  color: var(--sea-deep);
+}
+
+.day-bait span {
+  margin-top: 0.3rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.day-visual {
+  margin-bottom: 1rem;
+  padding: 0.95rem 1rem;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.day-visual h3,
+.day-visual p {
+  margin: 0;
+}
+
+.day-visual p {
+  margin-top: 0.3rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.timeline {
+  position: relative;
+  margin-top: 0.85rem;
+  height: 24px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: linear-gradient(90deg, #12303d 0%, #173d4e 100%);
+}
+
+.timeline-daylight {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(240, 198, 123, 0.9), rgba(223, 244, 248, 0.95));
+}
+
+.timeline-window {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(12, 111, 136, 0.96), rgba(10, 78, 103, 0.96));
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55);
+}
+
+.timeline-marker {
+  position: absolute;
+  top: -8px;
+  width: 2px;
+  height: 40px;
+  background: rgba(18, 48, 61, 0.65);
+}
+
+.timeline-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.55rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.timeline-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  margin-top: 0.7rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.timeline-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.timeline-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.timeline-dot.daylight {
+  background: rgba(240, 198, 123, 0.92);
+}
+
+.timeline-dot.window {
+  background: rgba(12, 111, 136, 0.96);
 }
 
 .window-card {
@@ -370,6 +483,16 @@ button {
   background: rgba(255, 255, 255, 0.65);
 }
 
+.condition-card.incoming {
+  background: linear-gradient(135deg, rgba(55, 163, 192, 0.18), rgba(223, 244, 248, 0.92));
+  border-color: rgba(55, 163, 192, 0.28);
+}
+
+.condition-card.outgoing {
+  background: linear-gradient(135deg, rgba(22, 90, 129, 0.18), rgba(224, 236, 245, 0.94));
+  border-color: rgba(22, 90, 129, 0.28);
+}
+
 .condition-card p {
   margin: 0;
 }
@@ -385,6 +508,38 @@ button {
   margin-top: 0.35rem;
   font-size: 1.4rem;
   font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.condition-card.incoming .condition-value {
+  color: #0c6a83;
+}
+
+.condition-card.outgoing .condition-value {
+  color: #124a72;
+}
+
+.condition-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 999px;
+  font-size: 1rem;
+  line-height: 1;
+  color: white;
+  flex: 0 0 auto;
+}
+
+.condition-card.incoming .condition-icon {
+  background: linear-gradient(135deg, #2aa5c7, #0c6a83);
+}
+
+.condition-card.outgoing .condition-icon {
+  background: linear-gradient(135deg, #2f6e98, #124a72);
 }
 
 .condition-note {
