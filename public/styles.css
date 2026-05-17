@@ -236,6 +236,12 @@ button {
   line-height: 1.35;
 }
 
+.day-alt-window {
+  margin-top: 0.18rem;
+  font-size: 0.78rem;
+  color: #6a8190;
+}
+
 .day-window.local-shift {
   color: var(--sea-deep);
   font-weight: 700;
