@@ -3,6 +3,7 @@ const spotSelect = document.querySelector("#spot");
 const dateInput = document.querySelector("#date");
 const summary = document.querySelector("#summary");
 const dayBait = document.querySelector("#day-bait");
+const localReportCard = document.querySelector("#local-report-card");
 const dayVisual = document.querySelector("#day-visual");
 const chart = document.querySelector("#chart");
 const statusLabel = document.querySelector("#status");
@@ -236,6 +237,7 @@ const SPECIES_PROFILES = [
 
 let currentWeek = [];
 let currentWeatherSeries = {};
+let currentLocalReport = null;
 let selectedDate = null;
 let currentRequestId = 0;
 
@@ -428,7 +430,142 @@ function describeTideMovement(recommendation) {
   };
 }
 
-function renderReferences(source, station) {
+function dayDifference(fromDate, toDate) {
+  const start = new Date(`${fromDate}T00:00:00`);
+  const end = new Date(`${toDate}T00:00:00`);
+  return Math.round((end - start) / 86400000);
+}
+
+function confidenceMultiplier(confidence) {
+  if (confidence === "high") {
+    return 1;
+  }
+  if (confidence === "medium") {
+    return 0.75;
+  }
+  return 0.5;
+}
+
+function summarizeWaterFeel(localReport) {
+  if (!localReport) {
+    return null;
+  }
+
+  const parts = [];
+  if (localReport.overallWeekMood) {
+    parts.push(`week reads ${localReport.overallWeekMood}`);
+  }
+  if (localReport.waterTempFeel) {
+    parts.push(`water feels ${localReport.waterTempFeel}`);
+  }
+  if (localReport.waterClarity) {
+    parts.push(`clarity is ${localReport.waterClarity}`);
+  }
+  return parts.join(", ");
+}
+
+function getSpotSpecificReportNote(localReport, spotKey) {
+  if (!localReport) {
+    return null;
+  }
+
+  if (spotKey === "santa_barbara") {
+    return localReport.stearnsWharfNotes || null;
+  }
+
+  if (spotKey === "goleta") {
+    return localReport.goletaNotes || null;
+  }
+
+  return null;
+}
+
+function evaluateLocalReport(localReport, spotKey, targetDate) {
+  if (!localReport || !Array.isArray(localReport.appliesTo) || !localReport.appliesTo.includes(spotKey)) {
+    return {
+      active: false,
+      scoreAdjustment: 0,
+      baitfishAdjustment: 0,
+      confidence: "low",
+      stale: false,
+      ageDays: null,
+      method: null,
+      note: null,
+    };
+  }
+
+  const ageDays = localReport.weekOf ? dayDifference(localReport.weekOf, targetDate) : 0;
+  const recencyMultiplier = ageDays > 10 ? 0.45 : ageDays > 7 ? 0.7 : 1;
+  const multiplier = confidenceMultiplier(localReport.confidence) * recencyMultiplier;
+  const baitfishMap = {
+    low: -12,
+    moderate: 0,
+    high: 10,
+  };
+
+  return {
+    active: true,
+    scoreAdjustment: Math.round((Number(localReport.scoreAdjustment) || 0) * multiplier),
+    baitfishAdjustment: Math.round((baitfishMap[localReport.baitfishActivity] || 0) * multiplier),
+    confidence: localReport.confidence || "medium",
+    stale: ageDays > 7,
+    ageDays,
+    method: localReport.productiveMethod || null,
+    note: getSpotSpecificReportNote(localReport, spotKey),
+  };
+}
+
+function describeLocalAdjustment(adjustment) {
+  if (adjustment > 0) {
+    return `Local read +${adjustment}`;
+  }
+  if (adjustment < 0) {
+    return `Local read ${adjustment}`;
+  }
+  return "Local read even";
+}
+
+function renderLocalReportCard(dayData) {
+  const localReport = dayData.localReport;
+  if (!localReport) {
+    localReportCard.hidden = true;
+    localReportCard.innerHTML = "";
+    return;
+  }
+
+  const influence = evaluateLocalReport(localReport, dayData.spotKey, dayData.date);
+  if (!influence.active) {
+    localReportCard.hidden = true;
+    localReportCard.innerHTML = "";
+    return;
+  }
+  const adjustmentClass = influence.scoreAdjustment > 0 ? "adjustment-positive" : influence.scoreAdjustment < 0 ? "adjustment-negative" : "adjustment-neutral";
+  const speciesLine = Array.isArray(localReport.topReportedSpecies) && localReport.topReportedSpecies.length
+    ? `Reported species this week: ${localReport.topReportedSpecies.join(", ")}.`
+    : "";
+  const summaryBits = [summarizeWaterFeel(localReport), speciesLine].filter(Boolean).join(" ");
+  const reasonLine = Array.isArray(localReport.why) && localReport.why.length ? localReport.why.join(" ") : "";
+  const methodLine = localReport.productiveMethod ? `Local method bias: ${localReport.productiveMethod}.` : "";
+  const staleLine = influence.stale ? `This report is ${influence.ageDays} days old, so its effect is slightly damped.` : "";
+  const spotNote = influence.note || "";
+
+  localReportCard.hidden = false;
+  localReportCard.innerHTML = `
+    <h3>This Week's Local Read</h3>
+    <p>${summaryBits || "A local weekly read is loaded for this spot."}</p>
+    ${reasonLine ? `<p>${reasonLine}</p>` : ""}
+    ${methodLine ? `<p>${methodLine}</p>` : ""}
+    ${spotNote ? `<p>${spotNote}</p>` : ""}
+    ${staleLine ? `<p>${staleLine}</p>` : ""}
+    <div class="local-report-meta">
+      <span class="local-pill ${adjustmentClass}">${describeLocalAdjustment(influence.scoreAdjustment)}</span>
+      <span class="local-pill confidence">Confidence ${localReport.confidence || "medium"}</span>
+      <span class="local-pill confidence">Week of ${localReport.weekOf || "unknown"}</span>
+    </div>
+  `;
+}
+
+function renderReferences(source, station, localReport) {
   references.innerHTML = "";
 
   references.append(
@@ -453,6 +590,16 @@ function renderReferences(source, station) {
       "https://gml.noaa.gov/grad/solcalc/",
     ),
   );
+
+  if (localReport) {
+    references.append(
+      createReferenceCard(
+        "Weekly Local Fishing Report Layer",
+        `A manually curated weekly report in data/local-report.json is used to nudge scores and method advice. Week of ${localReport.weekOf || "unknown"}.`,
+        null,
+      ),
+    );
+  }
 }
 
 function renderDayVisual(dayData, recommendation) {
@@ -855,7 +1002,7 @@ function buildRecommendations(dayData, weatherSeries) {
             : buoyConditions.dominantPeriodSeconds >= 10
               ? -4
               : 0;
-      const weightedScore =
+      const baseWeightedScore =
         9 +
         (tideScore * 0.68) +
         (windScore * 0.58) +
@@ -863,13 +1010,22 @@ function buildRecommendations(dayData, weatherSeries) {
         (lightScore * 0.5) +
         waterTempPenalty +
         swellPenalty;
-      const score = Math.max(18, Math.min(82, Math.round(weightedScore)));
-      const baitfishIndex = computeBaitfishIndex({
+      const baseScore = Math.max(18, Math.min(82, Math.round(baseWeightedScore)));
+      const localInfluence = evaluateLocalReport(dayData.localReport, dayData.spotKey, dayData.date);
+      const score = Math.max(18, Math.min(82, baseScore + localInfluence.scoreAdjustment));
+      const baseBaitfishIndex = computeBaitfishIndex({
         averageSwing,
         lightScore,
         conditions: windowConditions,
         buoyConditions,
       });
+      const baitfishScore = Math.max(0, Math.min(100, baseBaitfishIndex.score + localInfluence.baitfishAdjustment));
+      const baitfishIndex = {
+        score: baitfishScore,
+        label: baitfishLabel(baitfishScore),
+        baseScore: baseBaitfishIndex.score,
+        localAdjustment: localInfluence.baitfishAdjustment,
+      };
       const species = inferSpeciesForWindow({
         highTime: parseDateValue(high.t),
         highHeight: high.numericValue,
@@ -884,10 +1040,12 @@ function buildRecommendations(dayData, weatherSeries) {
         lightScore,
         waterTempPenalty,
         swellPenalty,
+        baseScore,
         score,
         conditions: windowConditions,
         baitfishIndex,
         buoyConditions,
+        localInfluence,
       });
       const tripType = inferTripType({
         species,
@@ -908,6 +1066,7 @@ function buildRecommendations(dayData, weatherSeries) {
         lightScore,
         waterTempPenalty,
         swellPenalty,
+        baseScore,
         score,
         rating: describeRating(score),
         conditions: windowConditions,
@@ -915,6 +1074,7 @@ function buildRecommendations(dayData, weatherSeries) {
         baitfishIndex,
         species,
         tripType,
+        localInfluence,
       };
     })
     .sort((left, right) => right.score - left.score);
@@ -924,6 +1084,8 @@ function renderRecommendations(dayData, recommendations) {
   summary.innerHTML = "";
   dayBait.hidden = true;
   dayBait.innerHTML = "";
+  localReportCard.hidden = true;
+  localReportCard.innerHTML = "";
   dayVisual.hidden = true;
   dayVisual.innerHTML = "";
 
@@ -938,9 +1100,11 @@ function renderRecommendations(dayData, recommendations) {
   if (dayData.baitRecommendation) {
     dayBait.hidden = false;
     const localTip = getLocalWharfTip(spotSelect.value, recommendations[0], dayData.baitRecommendation);
-    dayBait.innerHTML = `<strong>Best bait for this day: ${dayData.baitRecommendation.label}</strong><span>${dayData.baitRecommendation.detail}</span>${localTip ? `<span>${localTip}</span>` : ""}`;
+    const localMethod = dayData.localReportInfluence && dayData.localReportInfluence.method ? `Local report method this week: ${dayData.localReportInfluence.method}.` : "";
+    dayBait.innerHTML = `<strong>Best bait for this day: ${dayData.baitRecommendation.label}</strong><span>${dayData.baitRecommendation.detail}</span>${localMethod ? `<span>${localMethod}</span>` : ""}${localTip ? `<span>${localTip}</span>` : ""}`;
   }
 
+  renderLocalReportCard(dayData);
   renderDayVisual(dayData, recommendations[0]);
 
   const lowest = (dayData.highLowPredictions || [])
@@ -970,9 +1134,12 @@ function renderRecommendations(dayData, recommendations) {
       `Centered on the ${formatDateTime(recommendation.highTime)} high tide. ` +
       `Most likely species: ${recommendation.species.map((species) => species.label).join(", ")}. ` +
       `${recommendation.tripType.label}. ` +
-      `Score breakdown: Tide ${recommendation.tideScore} + Wind ${recommendation.windScore} + Waves ${recommendation.waveScore} + Light ${recommendation.lightScore}${recommendation.waterTempPenalty ? ` + Temp ${recommendation.waterTempPenalty}` : ""}${recommendation.swellPenalty ? ` + Swell ${recommendation.swellPenalty}` : ""}.`;
+      `Score breakdown: Tide ${recommendation.tideScore} + Wind ${recommendation.windScore} + Waves ${recommendation.waveScore} + Light ${recommendation.lightScore}${recommendation.waterTempPenalty ? ` + Temp ${recommendation.waterTempPenalty}` : ""}${recommendation.swellPenalty ? ` + Swell ${recommendation.swellPenalty}` : ""} + Local ${recommendation.localInfluence.scoreAdjustment}.`;
 
     facts.append(
+      createFact("Base score", String(recommendation.baseScore)),
+      createFact("Local adjustment", recommendation.localInfluence.scoreAdjustment >= 0 ? `+${recommendation.localInfluence.scoreAdjustment}` : String(recommendation.localInfluence.scoreAdjustment)),
+      createFact("Final score", String(recommendation.score)),
       createFact("High tide", `${formatTime(recommendation.highTime)} (${toFeet(recommendation.highHeight)})`),
       createFact("Incoming swing", toFeet(recommendation.incomingSwing)),
       createFact("Outgoing swing", toFeet(recommendation.outgoingSwing)),
@@ -1112,6 +1279,7 @@ function renderSelectedDay(date) {
     daySpecies: summarizeDaySpecies(recommendations),
     dayBaitfishIndex: recommendations[0] ? recommendations[0].baitfishIndex : null,
     dayTripType: recommendations[0] ? recommendations[0].tripType : null,
+    localReportInfluence: evaluateLocalReport(dayData.localReport, dayData.spotKey, dayData.date),
   };
   enrichedDay.baitRecommendation = recommendBait(enrichedDay.daySpecies, enrichedDay.dayTripType, enrichedDay.dayBaitfishIndex);
   renderRecommendations(enrichedDay, recommendations);
@@ -1132,9 +1300,12 @@ function renderWeek(spot, daysData) {
     return {
       ...dayData,
       recommendations,
+      spotKey: dayData.spotKey || spot.id,
+      localReport: dayData.localReport || currentLocalReport,
       daySpecies: summarizeDaySpecies(recommendations),
       dayBaitfishIndex: recommendations[0] ? recommendations[0].baitfishIndex : null,
       dayTripType: recommendations[0] ? recommendations[0].tripType : null,
+      localReportInfluence: evaluateLocalReport(dayData.localReport || currentLocalReport, dayData.spotKey || spot.id, dayData.date),
       baitRecommendation: null,
       bestScore: recommendations[0] ? recommendations[0].score : 0,
       bestWindow: recommendations[0] ? `${formatTime(recommendations[0].start)}-${formatTime(recommendations[0].end)}` : "No high tide window",
@@ -1175,6 +1346,11 @@ function renderWeek(spot, daysData) {
     windowLine.textContent = dayData.bestScore
       ? `Best window: ${dayData.bestWindow}`
       : "No strong high-tide block found";
+    if (dayData.localReportInfluence && dayData.localReportInfluence.active && dayData.localReportInfluence.scoreAdjustment !== 0) {
+      const adjustment = dayData.localReportInfluence.scoreAdjustment > 0 ? `+${dayData.localReportInfluence.scoreAdjustment}` : String(dayData.localReportInfluence.scoreAdjustment);
+      windowLine.textContent += ` | Local ${adjustment}`;
+      windowLine.classList.add("local-shift");
+    }
     sunLine.innerHTML = `☀ ${dayData.sunTimes.sunrise ? formatTime(dayData.sunTimes.sunrise) : "?"}<br />☾ ${dayData.sunTimes.sunset ? formatTime(dayData.sunTimes.sunset) : "?"}`;
     meta.append(tripChip, baitfishChip);
 
@@ -1197,7 +1373,7 @@ function renderWeek(spot, daysData) {
 
   setSuccessState(
     bestDay
-      ? `Loaded ${daysData.length} days for ${spot.name}. Best current score: ${bestDay.bestScore} on ${formatDayLabel(bestDay.date)}.`
+      ? `Loaded ${daysData.length} days for ${spot.name}. Best current score: ${bestDay.bestScore} on ${formatDayLabel(bestDay.date)}.${currentLocalReport ? ` Local weekly read from ${currentLocalReport.weekOf || "this week"} is active.` : ""}`
       : `Loaded ${daysData.length} days for ${spot.name}, but no strong high-tide windows were found.`,
   );
 }
@@ -1211,6 +1387,8 @@ async function loadWeek(spot, startDate) {
   summary.innerHTML = "";
   dayBait.hidden = true;
   dayBait.innerHTML = "";
+  localReportCard.hidden = true;
+  localReportCard.innerHTML = "";
   dayVisual.hidden = true;
   dayVisual.innerHTML = "";
   conditions.innerHTML = "";
@@ -1230,8 +1408,16 @@ async function loadWeek(spot, startDate) {
     }
 
     currentWeatherSeries = data.weatherSeries || {};
-    renderReferences(data.source, data.station);
-    renderWeek(data.spot, data.daysData || []);
+    currentLocalReport = data.localReport || null;
+    renderReferences(data.source, data.station, currentLocalReport);
+    renderWeek(
+      data.spot,
+      (data.daysData || []).map((dayData) => ({
+        ...dayData,
+        spotKey: data.spot && data.spot.id ? data.spot.id : spot,
+        localReport: currentLocalReport,
+      })),
+    );
   } catch (error) {
     if (requestId !== currentRequestId) {
       return;
@@ -1245,7 +1431,8 @@ async function loadWeek(spot, startDate) {
     statusLabel.textContent = "Unable to load conditions.";
     weekStatus.textContent = "No weekly forecast data available";
     conditionsCaption.textContent = "No forecast data available";
-    renderReferences(null, PRESET_SPOTS[spot]?.station || "Unknown");
+    currentLocalReport = null;
+    renderReferences(null, PRESET_SPOTS[spot]?.station || "Unknown", null);
     setErrorState(
       `We couldn't finish loading the weekly plan. This usually means NOAA or NWS timed out, or Render couldn't reach them in time. Details: ${error.message}`,
     );

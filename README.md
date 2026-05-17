@@ -10,6 +10,7 @@ A small fishing-planning app for Santa Barbara and Goleta pier trips. It uses NO
 - Preloads the current day plus the next 6 days so you can compare a full week at a glance.
 - Lets you click any day to inspect its best high-tide windows in detail.
 - Suggests the most likely species mix for each window and each day.
+- Lets you add a manual weekly local fishing report layer that can nudge the score, baitfish read, and method advice.
 - Ranks windows using:
   - high-tide height relative to the rest of the day
   - the size of the swing from nearby low tides
@@ -74,11 +75,39 @@ This app is built around public NOAA and NWS services:
 - Santa Barbara station example: https://tidesandcurrents.noaa.gov/stationhome.html?id=9411340
 - NWS API docs: https://www.weather.gov/documentation/services-web-api
 - NOAA solar calculator reference: https://gml.noaa.gov/grad/solcalc/
+- A manually curated local report file at `data/local-report.json`
+
+## Weekly local report workflow
+
+This app now supports a human-in-the-loop local fishing report layer.
+
+Use this workflow each week:
+
+1. Copy the Santa Barbara / Goleta-relevant parts of your subscribed fishing report into ChatGPT.
+2. Use the saved prompt in `prompts/weekly-local-report-prompt.md`.
+3. Replace the contents of `data/local-report.json` with the JSON ChatGPT returns.
+4. Commit and push your changes so Render redeploys the site.
+
+The app will then:
+
+- show a `This Week's Local Read` card in the Selected day area
+- apply a modest local score adjustment
+- nudge the baitfish index
+- surface method guidance like `cast sabiki`
+
+The local report layer is intentionally small and transparent:
+
+- `Base score` is still computed from tides, wind, swell proxy, light, and buoy data
+- `Local adjustment` comes from `data/local-report.json`
+- `Final score` is what shows in the app
+
+This keeps the site useful as a planner without pretending the weekly report is an automated live feed.
 
 ## Notes
 
 - The default tide station is `9411340` for Santa Barbara. Goleta Pier currently reuses that nearby tide station while applying Goleta-specific weather and sunrise/sunset coordinates.
 - Wave height is coming from the NWS forecast grid as a practical first-pass swell/surf signal. A future refinement could use a more explicit nearshore swell model if you want a more fishing-specific surf read.
+- The weekly local report file is meant to be your own distilled interpretation of a subscribed report, not a verbatim copy of paid content.
 - Species guidance is heuristic for now. It is meant to help decide whether a family trip looks promising, not to guarantee what will bite.
 - This version still has room to grow with species targets, moon phase, weather icons, safety thresholds, and personal trip constraints.
 - Tide timing alone is a useful shortcut, but it is still a heuristic rather than a guarantee of fishing success.

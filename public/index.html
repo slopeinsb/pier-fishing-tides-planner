@@ -37,9 +37,10 @@
         </form>
         <p class="hint">
           Recommendations combine NOAA tides, NWS marine forecast conditions,
-          and sunrise/sunset timing. Tide stays the anchor, but wind, wave
-          height, and dawn/dusk now help sort the best family fishing windows
-          across the next week while suggesting which species are most likely.
+          sunrise/sunset timing, and your own weekly local report layer. Tide
+          stays the anchor, but wind, local context, and dawn/dusk now help
+          sort the best family fishing windows across the next week while
+          suggesting which species are most likely.
         </p>
       </section>
 
@@ -59,6 +60,7 @@
             <span id="status">Choose a day from the week view.</span>
           </div>
           <div id="day-bait" class="day-bait" hidden></div>
+          <div id="local-report-card" class="local-report-card" hidden></div>
           <div id="day-visual" class="day-visual" hidden></div>
           <div id="summary"></div>
         </article>
@@ -90,6 +92,7 @@
           <li>Favor bigger swings from nearby low tides because moving water often fishes better.</li>
           <li>Reward calmer wind and manageable wave height using NWS forecast grids.</li>
           <li>Add a bonus when a window overlaps the hour around sunrise or sunset.</li>
+          <li>Let a weekly local fishing report nudge the score up or down when local reality differs from the forecast.</li>
           <li>Use those conditions to suggest the most likely species mix for each window.</li>
           <li>Keep the NOAA station visible so you can validate whether a nearby pier is using the right reference point.</li>
         </ul>

@@ -6,6 +6,8 @@ const { URL } = require("node:url");
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || (process.env.RENDER ? "0.0.0.0" : "127.0.0.1");
 const PUBLIC_DIR = path.join(__dirname, "public");
+const DATA_DIR = path.join(__dirname, "data");
+const LOCAL_REPORT_FILE = path.join(DATA_DIR, "local-report.json");
 const NOAA_BASE_URL = "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter";
 const WEATHER_BASE_URL = "https://api.weather.gov";
 const NDBC_BASE_URL = "https://www.ndbc.noaa.gov/data/realtime2";
@@ -146,6 +148,38 @@ function getSpot(searchParams) {
   }
 
   return SPOTS.santa_barbara;
+}
+
+function readLocalReport() {
+  try {
+    if (!fs.existsSync(LOCAL_REPORT_FILE)) {
+      return null;
+    }
+
+    const raw = fs.readFileSync(LOCAL_REPORT_FILE, "utf8");
+    const parsed = JSON.parse(raw);
+
+    return {
+      weekOf: parsed.weekOf || null,
+      region: parsed.region || "Santa Barbara",
+      appliesTo: Array.isArray(parsed.appliesTo) && parsed.appliesTo.length ? parsed.appliesTo : Object.keys(SPOTS),
+      overallWeekMood: parsed.overallWeekMood || null,
+      baitfishActivity: parsed.baitfishActivity || null,
+      waterClarity: parsed.waterClarity || null,
+      waterTempFeel: parsed.waterTempFeel || null,
+      topReportedSpecies: Array.isArray(parsed.topReportedSpecies) ? parsed.topReportedSpecies : [],
+      productiveMethod: parsed.productiveMethod || null,
+      stearnsWharfNotes: parsed.stearnsWharfNotes || null,
+      goletaNotes: parsed.goletaNotes || null,
+      scoreAdjustment: Number.isFinite(Number(parsed.scoreAdjustment)) ? Number(parsed.scoreAdjustment) : 0,
+      confidence: parsed.confidence || "medium",
+      why: Array.isArray(parsed.why) ? parsed.why : [],
+      sourceNote: parsed.sourceNote || "Manually distilled from a subscribed Southern California fishing report.",
+    };
+  } catch (error) {
+    console.error("Unable to read local report:", error.message);
+    return null;
+  }
 }
 
 function parseDateAtMidnight(dateString) {
@@ -565,6 +599,7 @@ async function handleWeekApi(requestUrl, response) {
       fetchForecastGrid(spot.latitude, spot.longitude),
       fetchBuoyConditions(spot.buoyStation),
     ]);
+    const localReport = readLocalReport();
     const endDate = addDays(start, days - 1);
     const tideRange = await fetchTideRange(spot.station, start, endDate);
     const weatherSeries = {
@@ -604,12 +639,14 @@ async function handleWeekApi(requestUrl, response) {
         weather: "https://api.weather.gov",
         buoy: `https://www.ndbc.noaa.gov/station_page.php?station=${spot.buoyStation}`,
         sunriseSunset: "Calculated locally using NOAA solar calculation formulas.",
+        localReport: localReport ? "data/local-report.json" : null,
       },
       forecastMeta: {
         forecastOffice: forecast.points && forecast.points.cwa,
         forecastGridData: forecast.points && forecast.points.forecastGridData,
       },
       weatherSeries,
+      localReport,
       daysData: dayPayloads,
     });
   } catch (error) {

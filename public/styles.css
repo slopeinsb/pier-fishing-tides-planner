@@ -236,6 +236,11 @@ button {
   line-height: 1.35;
 }
 
+.day-window.local-shift {
+  color: var(--sea-deep);
+  font-weight: 700;
+}
+
 .grid {
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
@@ -288,6 +293,62 @@ button {
   margin-top: 0.3rem;
   color: var(--muted);
   line-height: 1.5;
+}
+
+.local-report-card {
+  margin-bottom: 1rem;
+  padding: 0.95rem 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(12, 111, 136, 0.18);
+  background: linear-gradient(135deg, rgba(12, 111, 136, 0.1), rgba(255, 255, 255, 0.92));
+}
+
+.local-report-card h3,
+.local-report-card p {
+  margin: 0;
+}
+
+.local-report-card p {
+  margin-top: 0.3rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.local-report-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.65rem;
+}
+
+.local-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.3rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.77rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.local-pill.adjustment-negative {
+  background: rgba(149, 100, 32, 0.16);
+  color: #8a5a14;
+}
+
+.local-pill.adjustment-positive {
+  background: rgba(47, 125, 75, 0.14);
+  color: #2f7d4b;
+}
+
+.local-pill.adjustment-neutral {
+  background: rgba(12, 111, 136, 0.12);
+  color: #0c5f73;
+}
+
+.local-pill.confidence {
+  background: rgba(18, 48, 61, 0.08);
+  color: var(--sea-deep);
 }
 
 .day-visual {

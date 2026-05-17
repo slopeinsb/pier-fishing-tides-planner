@@ -1,0 +1,21 @@
+{
+  "weekOf": "2026-05-17",
+  "region": "Santa Barbara",
+  "appliesTo": ["santa_barbara", "goleta"],
+  "overallWeekMood": "slow",
+  "baitfishActivity": "low",
+  "waterClarity": "poor",
+  "waterTempFeel": "cold",
+  "topReportedSpecies": ["barred surfperch", "corbina", "halibut"],
+  "productiveMethod": "mixed",
+  "stearnsWharfNotes": "Wind and dirty water slowed pier fishing. Surfperch still available but larger game fish reports weak. Conditions likely poor for several days before gradual improvement midweek.",
+  "goletaNotes": "Strong wind and swell likely reduce pier comfort and water clarity. No meaningful local halibut or baitfish momentum reported.",
+  "scoreAdjustment": -4,
+  "confidence": "medium",
+  "why": [
+    "Strong northwest wind and swell expected to worsen nearshore conditions",
+    "Dirty water and upwelling likely reduce bait visibility and fish activity",
+    "Only consistent reports were smaller surf species while legal halibut and seabass reports were weak"
+  ],
+  "sourceNote": "Manually distilled from a subscribed Southern California fishing report."
+}
