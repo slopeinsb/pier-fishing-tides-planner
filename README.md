@@ -2,6 +2,8 @@
 
 A small fishing-planning app for Santa Barbara and Goleta pier trips. It uses NOAA CO-OPS tide predictions, adds National Weather Service forecast conditions, and ranks the classic "two hours before and after high tide" windows so you can spot the strongest options for the day faster.
 
+For the product plan and application specification, see [docs/application-spec.md](/Users/randall/Documents/New project/docs/application-spec.md:1).
+
 ## What it does
 
 - Fetches official NOAA tide predictions through a tiny local Node server.

@@ -191,6 +191,13 @@ button {
   color: var(--sea-deep);
 }
 
+.day-rank {
+  margin-top: 0.12rem;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.25;
+}
+
 .day-note {
   margin-top: 0.35rem;
   color: var(--muted);

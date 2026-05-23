@@ -276,6 +276,10 @@ function parseDateValue(value) {
   return new Date(value);
 }
 
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
 function formatDateForInput(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -383,15 +387,65 @@ function degreesToCompass(degrees) {
 }
 
 function describeRating(score) {
-  if (score >= 66) {
+  if (score >= 72) {
     return { label: "Standout", className: "excellent" };
   }
 
-  if (score >= 52) {
+  if (score >= 54) {
     return { label: "Promising", className: "good" };
   }
 
   return { label: "Watchable", className: "fair" };
+}
+
+function ordinal(value) {
+  const mod10 = value % 10;
+  const mod100 = value % 100;
+  if (mod10 === 1 && mod100 !== 11) {
+    return `${value}st`;
+  }
+  if (mod10 === 2 && mod100 !== 12) {
+    return `${value}nd`;
+  }
+  if (mod10 === 3 && mod100 !== 13) {
+    return `${value}rd`;
+  }
+  return `${value}th`;
+}
+
+function median(values) {
+  if (!values.length) {
+    return 0;
+  }
+
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+
+  if (sorted.length % 2 === 0) {
+    return (sorted[middle - 1] + sorted[middle]) / 2;
+  }
+
+  return sorted[middle];
+}
+
+function buildLocalRankLabel(rank, total) {
+  if (!rank || !total) {
+    return "Still ranking this week";
+  }
+
+  if (rank === 1) {
+    return `Best of ${total} this week`;
+  }
+
+  if (rank === total) {
+    return `Lowest of ${total} this week`;
+  }
+
+  if (rank === Math.ceil(total / 2)) {
+    return "Middle of this week's pack";
+  }
+
+  return `${ordinal(rank)} of ${total} this week`;
 }
 
 function createFact(label, value) {
@@ -549,14 +603,14 @@ function evaluateLocalReport(localReport, spotKey, targetDate) {
   const recencyMultiplier = ageDays > 10 ? 0.45 : ageDays > 7 ? 0.7 : 1;
   const multiplier = confidenceMultiplier(localReport.confidence) * recencyMultiplier;
   const baitfishMap = {
-    low: -18,
+    low: -10,
     moderate: 0,
-    high: 10,
+    high: 6,
   };
   const waterTempMap = {
-    cold: -4,
+    cold: -3,
     seasonal: 0,
-    warm: 2,
+    warm: 1,
   };
   const clarityMap = {
     poor: -3,
@@ -564,10 +618,10 @@ function evaluateLocalReport(localReport, spotKey, targetDate) {
     good: 1,
   };
   const moodMap = {
-    slow: -2,
+    slow: -3,
     fair: 0,
     improving: 2,
-    active: 4,
+    active: 3,
   };
   const manualAdjustment = Number(localReport.scoreAdjustment) || 0;
   const waterTempAdjustment = waterTempMap[localReport.waterTempFeel] || 0;
@@ -575,12 +629,12 @@ function evaluateLocalReport(localReport, spotKey, targetDate) {
   const weekMoodAdjustment = moodMap[localReport.overallWeekMood] || 0;
   const combinedScoreAdjustment = manualAdjustment + waterTempAdjustment + clarityAdjustment + weekMoodAdjustment;
   const scaledScoreAdjustment = Math.round(combinedScoreAdjustment * multiplier);
-  const scaledBaitfishAdjustment = Math.round(((baitfishMap[localReport.baitfishActivity] || 0) + (localReport.waterTempFeel === "cold" ? -10 : 0)) * multiplier);
+  const scaledBaitfishAdjustment = Math.round(((baitfishMap[localReport.baitfishActivity] || 0) + (localReport.waterTempFeel === "cold" ? -6 : 0)) * multiplier);
 
   return {
     active: true,
-    scoreAdjustment: Math.max(-14, Math.min(10, scaledScoreAdjustment)),
-    baitfishAdjustment: Math.max(-28, Math.min(12, scaledBaitfishAdjustment)),
+    scoreAdjustment: clamp(scaledScoreAdjustment, -8, 6),
+    baitfishAdjustment: clamp(scaledBaitfishAdjustment, -14, 8),
     waterTempAdjustment: Math.round(waterTempAdjustment * multiplier),
     clarityAdjustment: Math.round(clarityAdjustment * multiplier),
     weekMoodAdjustment: Math.round(weekMoodAdjustment * multiplier),
@@ -743,10 +797,10 @@ function setErrorState(message) {
 }
 
 function confidenceLabel(score) {
-  if (score >= 78) {
+  if (score >= 74) {
     return "High";
   }
-  if (score >= 62) {
+  if (score >= 56) {
     return "Medium";
   }
   return "Low";
@@ -905,7 +959,7 @@ function applyDaylightPriority(recommendations) {
       daylightAlternativePenalty = -4;
     }
 
-    const score = Math.max(22, Math.min(86, recommendation.score + daylightAlternativePenalty));
+    const score = clamp(recommendation.score + daylightAlternativePenalty, 18, 84);
 
     return {
       ...recommendation,
@@ -1085,9 +1139,9 @@ function computeBaitfishIndex(recommendation) {
 
   if (recommendation.buoyConditions && recommendation.buoyConditions.waterTempF !== null) {
     if (recommendation.buoyConditions.waterTempF < 58) {
-      score -= 14;
+      score -= 10;
     } else if (recommendation.buoyConditions.waterTempF < 60) {
-      score -= 8;
+      score -= 6;
     } else if (recommendation.buoyConditions.waterTempF < 62) {
       score -= 3;
     }
@@ -1385,19 +1439,19 @@ function buildRecommendations(dayData, weatherSeries) {
         buoyConditions.waterTempF === null || buoyConditions.waterTempF === undefined
           ? 0
           : buoyConditions.waterTempF < 58
-            ? -18
+            ? -8
             : buoyConditions.waterTempF < 60
-              ? -12
+              ? -5
               : buoyConditions.waterTempF < 62
-                ? -6
+                ? -2
                 : 0;
       const swellPenalty =
         buoyConditions.dominantPeriodSeconds === null || buoyConditions.dominantPeriodSeconds === undefined
           ? 0
           : buoyConditions.dominantPeriodSeconds >= 12
-            ? -8
+            ? -5
             : buoyConditions.dominantPeriodSeconds >= 10
-              ? -4
+              ? -2
               : 0;
       const baseBaitfishIndex = computeBaitfishIndex({
         averageSwing,
@@ -1429,20 +1483,31 @@ function buildRecommendations(dayData, weatherSeries) {
         },
         baseBaitfishIndex.score,
       );
-      const baseWeightedScore =
-        11 +
-        (waterStability.score * 0.96) +
-        (tideScore * 0.46) +
-        (lightScore * 0.52) +
-        daylightScore +
-        spotAdjustments.tideDirectionAdjustment +
-        spotAdjustments.baitPresenceAdjustment +
-        spotAdjustments.sabikiCurrentPenalty +
-        (dayData.spotKey === "goleta" ? ((baseBaitfishIndex.score - 50) * 0.14) : ((baseBaitfishIndex.score - 50) * 0.1)) +
-        waterTempPenalty +
-        swellPenalty;
-      const baseScore = Math.max(22, Math.min(86, Math.round(baseWeightedScore)));
-      const score = Math.max(22, Math.min(86, baseScore + localInfluence.scoreAdjustment));
+      const rawWindowSignals = {
+        waterStability: waterStability.score,
+        tideSetup: Math.round(tideScore + ((incomingSwing + outgoingSwing) * 1.2)),
+        baitOpportunity: baseBaitfishIndex.score,
+        fishableTiming: Math.round((lightScore * 1.2) + daylightScore + (windowConditions.daylightRatio * 18)),
+      };
+      const spotAdjustedSignals = {
+        tideDirectionAdjustment: spotAdjustments.tideDirectionAdjustment,
+        baitPresenceAdjustment: spotAdjustments.baitPresenceAdjustment,
+        sabikiCurrentPenalty: spotAdjustments.sabikiCurrentPenalty,
+        coldWaterPenalty: waterTempPenalty,
+        swellPenalty,
+      };
+      const rawComposite =
+        (rawWindowSignals.waterStability * 0.95) +
+        (rawWindowSignals.tideSetup * 0.42) +
+        ((rawWindowSignals.baitOpportunity - 50) * (dayData.spotKey === "goleta" ? 0.18 : 0.12)) +
+        (rawWindowSignals.fishableTiming * 0.78) +
+        spotAdjustedSignals.tideDirectionAdjustment +
+        spotAdjustedSignals.baitPresenceAdjustment +
+        spotAdjustedSignals.sabikiCurrentPenalty +
+        spotAdjustedSignals.coldWaterPenalty +
+        spotAdjustedSignals.swellPenalty;
+      const baseScore = Math.round(rawComposite);
+      const score = baseScore;
       const baitfishScore = Math.max(0, Math.min(100, baseBaitfishIndex.score + localInfluence.baitfishAdjustment));
       const baitfishIndex = {
         score: baitfishScore,
@@ -1511,6 +1576,9 @@ function buildRecommendations(dayData, weatherSeries) {
         baitPresenceAdjustment: spotAdjustments.baitPresenceAdjustment,
         sabikiCurrentPenalty: spotAdjustments.sabikiCurrentPenalty,
         spotReasons: spotAdjustments.reasons,
+        rawWindowSignals,
+        spotAdjustedSignals,
+        rawComposite,
         baseScore,
         score,
         rating: describeRating(score),
@@ -1524,6 +1592,76 @@ function buildRecommendations(dayData, weatherSeries) {
     })
   )
     .sort((left, right) => right.score - left.score);
+}
+
+function relativeScoreForWeek(daysData, spotKey) {
+  const recommendations = daysData
+    .flatMap((dayData) => (dayData.recommendations || []).map((recommendation) => ({ dayData, recommendation })));
+
+  if (!recommendations.length) {
+    return daysData;
+  }
+
+  const rawValues = recommendations.map((entry) => entry.recommendation.rawComposite + (entry.recommendation.daylightAlternativePenalty || 0));
+  const rawMedian = median(rawValues);
+  const rawMin = Math.min(...rawValues);
+  const rawMax = Math.max(...rawValues);
+  const rawSpread = Math.max(rawMax - rawMin, 1);
+  const normalizedWeekStrength = clamp((rawMedian - 20) / 28, 0, 1);
+  const weekFloor = 22 + (normalizedWeekStrength * 12);
+  const weekCeiling = 44 + (normalizedWeekStrength * 28);
+
+  const rankedRecommendations = [...recommendations].sort(
+    (left, right) =>
+      (right.recommendation.rawComposite + (right.recommendation.daylightAlternativePenalty || 0)) -
+      (left.recommendation.rawComposite + (left.recommendation.daylightAlternativePenalty || 0)),
+  );
+
+  rankedRecommendations.forEach((entry, index) => {
+    const recommendation = entry.recommendation;
+    const percentile = rankedRecommendations.length === 1
+      ? 1
+      : 1 - (index / (rankedRecommendations.length - 1));
+    const effectiveRawComposite = recommendation.rawComposite + (recommendation.daylightAlternativePenalty || 0);
+    const rawDelta = effectiveRawComposite - rawMedian;
+    const deltaNormalized = clamp(rawDelta / Math.max(rawSpread * 0.42, 7), -1.1, 1.1);
+    const relativeBase = weekFloor + (percentile * (weekCeiling - weekFloor));
+    const localNudge = clamp((recommendation.localInfluence?.scoreAdjustment || 0) * 0.8, -6, 5);
+    const displayScore = Math.round(clamp(relativeBase + (deltaNormalized * 8) + localNudge, 18, 84));
+
+    Object.assign(recommendation, {
+      relativeRank: index + 1,
+      relativePercentile: Math.round(percentile * 100),
+      effectiveRawComposite,
+      rawDelta,
+      displayScore,
+      score: displayScore,
+      rating: describeRating(displayScore),
+    });
+  });
+
+  daysData.forEach((dayData) => {
+    const ranked = [...(dayData.recommendations || [])].sort((left, right) => right.score - left.score);
+    dayData.recommendations = ranked;
+    dayData.daySpecies = summarizeDaySpecies(ranked);
+    dayData.dayBaitfishIndex = ranked[0] ? ranked[0].baitfishIndex : null;
+    dayData.dayTripType = ranked[0] ? ranked[0].tripType : null;
+    dayData.localReportInfluence = evaluateLocalReport(dayData.localReport || currentLocalReport, dayData.spotKey || spotKey, dayData.date);
+    dayData.bestScore = ranked[0] ? ranked[0].score : 0;
+    dayData.bestWindow = ranked[0] ? `${formatTime(ranked[0].start)}-${formatTime(ranked[0].end)}` : "No high tide window";
+    dayData.secondHighTide = ranked[1] ? formatTime(ranked[1].highTime) : null;
+  });
+
+  const rankedDays = [...daysData].sort((left, right) => right.bestScore - left.bestScore);
+  rankedDays.forEach((dayData, index) => {
+    dayData.dayRank = index + 1;
+    dayData.relativePercentile = rankedDays.length === 1
+      ? 100
+      : Math.round((1 - (index / (rankedDays.length - 1))) * 100);
+    dayData.localRankLabel = buildLocalRankLabel(dayData.dayRank, rankedDays.length);
+  });
+
+  return daysData;
 }
 
 function renderRecommendations(dayData, recommendations) {
@@ -1580,12 +1718,13 @@ function renderRecommendations(dayData, recommendations) {
       `Centered on the ${formatDateTime(recommendation.highTime)} high tide. ` +
       `Most likely species: ${recommendation.species.map((species) => species.label).join(", ")}. ` +
       `${recommendation.tripType.label}. ` +
-      `Score breakdown: Stability ${recommendation.waterStability.score} + Tide ${recommendation.tideScore}${recommendation.tideDirectionAdjustment ? ` + Phase ${recommendation.tideDirectionAdjustment}` : ""}${recommendation.baitPresenceAdjustment ? ` + Bait ${recommendation.baitPresenceAdjustment}` : ""}${recommendation.sabikiCurrentPenalty ? ` + Current ${recommendation.sabikiCurrentPenalty}` : ""} + Light ${recommendation.lightScore}${recommendation.daylightScore ? ` + Daylight ${recommendation.daylightScore}` : ""}${recommendation.daylightAlternativePenalty ? ` + Daylight priority ${recommendation.daylightAlternativePenalty}` : ""}${recommendation.waterTempPenalty ? ` + Temp ${recommendation.waterTempPenalty}` : ""}${recommendation.swellPenalty ? ` + Swell ${recommendation.swellPenalty}` : ""} + Local ${recommendation.localInfluence.scoreAdjustment}.`;
+      `This local index compares this window with the rest of the week's options for the same pier, then applies a small local-report nudge.`;
 
     facts.append(
-      createFact("Base score", String(recommendation.baseScore)),
-      createFact("Local adjustment", recommendation.localInfluence.scoreAdjustment >= 0 ? `+${recommendation.localInfluence.scoreAdjustment}` : String(recommendation.localInfluence.scoreAdjustment)),
-      createFact("Final score", String(recommendation.score)),
+      createFact("Local rank", `${ordinal(recommendation.relativeRank)} of ${dayData.totalWindows || recommendations.length}`),
+      createFact("Raw setup", String(Math.round(recommendation.effectiveRawComposite ?? recommendation.rawComposite))),
+      createFact("Local nudge", recommendation.localInfluence.scoreAdjustment >= 0 ? `+${recommendation.localInfluence.scoreAdjustment}` : String(recommendation.localInfluence.scoreAdjustment)),
+      createFact("Displayed index", String(recommendation.score)),
       createFact("High tide", `${formatTime(recommendation.highTime)} (${toFeet(recommendation.highHeight)})`),
       createFact("Tide phase", formatTidePhase(recommendation.tidePhase)),
       createFact("Incoming swing", toFeet(recommendation.incomingSwing)),
@@ -1739,14 +1878,11 @@ function renderSelectedDay(date) {
   }
 
   selectedDate = date;
-  const recommendations = buildRecommendations(dayData, currentWeatherSeries);
+  const recommendations = dayData.recommendations || [];
   const enrichedDay = {
     ...dayData,
     recommendations,
-    daySpecies: summarizeDaySpecies(recommendations),
-    dayBaitfishIndex: recommendations[0] ? recommendations[0].baitfishIndex : null,
-    dayTripType: recommendations[0] ? recommendations[0].tripType : null,
-    localReportInfluence: evaluateLocalReport(dayData.localReport, dayData.spotKey, dayData.date),
+    totalWindows: currentWeek.reduce((sum, entry) => sum + ((entry.recommendations || []).length), 0),
   };
   enrichedDay.baitRecommendation = recommendBait(
     enrichedDay.daySpecies,
@@ -1757,7 +1893,7 @@ function renderSelectedDay(date) {
   renderRecommendations(enrichedDay, recommendations);
   renderConditions(enrichedDay, PRESET_SPOTS[spotSelect.value]);
   renderChart(dayData.intervalPredictions || []);
-  statusLabel.textContent = `${PRESET_SPOTS[spotSelect.value].name} on ${formatDayLabel(date)} using NOAA station ${dayData.station}.`;
+  statusLabel.textContent = `${PRESET_SPOTS[spotSelect.value].name} on ${formatDayLabel(date)}. ${dayData.localRankLabel || "Still ranking this week"} using NOAA station ${dayData.station}.`;
 
   Array.from(weekGrid.children).forEach((card) => {
     card.classList.toggle("selected", card.dataset.date === date);
@@ -1774,16 +1910,11 @@ function renderWeek(spot, daysData) {
       recommendations,
       spotKey: dayData.spotKey || spot.id,
       localReport: dayData.localReport || currentLocalReport,
-      daySpecies: summarizeDaySpecies(recommendations),
-      dayBaitfishIndex: recommendations[0] ? recommendations[0].baitfishIndex : null,
-      dayTripType: recommendations[0] ? recommendations[0].tripType : null,
-      localReportInfluence: evaluateLocalReport(dayData.localReport || currentLocalReport, dayData.spotKey || spot.id, dayData.date),
       baitRecommendation: null,
-      bestScore: recommendations[0] ? recommendations[0].score : 0,
-      bestWindow: recommendations[0] ? `${formatTime(recommendations[0].start)}-${formatTime(recommendations[0].end)}` : "No high tide window",
-      secondHighTide: recommendations[1] ? formatTime(recommendations[1].highTime) : null,
     };
   });
+
+  relativeScoreForWeek(enrichedDays, spot.id);
 
   enrichedDays.forEach((dayData) => {
     dayData.baitRecommendation = recommendBait(
@@ -1801,6 +1932,7 @@ function renderWeek(spot, daysData) {
     const dateLabel = document.createElement("p");
     const score = document.createElement("p");
     const meta = document.createElement("div");
+    const rankLine = document.createElement("p");
     const tripChip = document.createElement("span");
     const baitfishChip = document.createElement("span");
     const windowLine = document.createElement("p");
@@ -1813,6 +1945,7 @@ function renderWeek(spot, daysData) {
     dateLabel.className = "day-date";
     score.className = "day-score";
     meta.className = "day-meta";
+    rankLine.className = "day-rank";
     tripChip.className = "day-chip trip";
     baitfishChip.className = "day-chip baitfish";
     windowLine.className = "day-window";
@@ -1821,6 +1954,7 @@ function renderWeek(spot, daysData) {
 
     dateLabel.textContent = formatDayLabel(dayData.date);
     score.textContent = dayData.bestScore ? String(dayData.bestScore) : "0";
+    rankLine.textContent = dayData.localRankLabel || "Still ranking this week";
     tripChip.textContent = dayData.dayTripType ? dayData.dayTripType.label : "Mixed";
     baitfishChip.textContent = dayData.dayBaitfishIndex ? `Baitfish ${dayData.dayBaitfishIndex.label}` : "Baitfish N/A";
     windowLine.textContent = dayData.bestScore
@@ -1837,7 +1971,7 @@ function renderWeek(spot, daysData) {
     sunLine.innerHTML = `☀ ${dayData.sunTimes.sunrise ? formatTime(dayData.sunTimes.sunrise) : "?"}<br />☾ ${dayData.sunTimes.sunset ? formatTime(dayData.sunTimes.sunset) : "?"}`;
     meta.append(tripChip, baitfishChip);
 
-    card.append(dateLabel, score, meta, windowLine, secondLine, sunLine);
+    card.append(dateLabel, score, rankLine, meta, windowLine, secondLine, sunLine);
     card.addEventListener("click", () => {
       renderSelectedDay(dayData.date);
     });
@@ -1846,7 +1980,7 @@ function renderWeek(spot, daysData) {
 
   const bestDay = enrichedDays.reduce((best, day) => (!best || day.bestScore > best.bestScore ? day : best), null);
   weekStatus.textContent = bestDay
-    ? `Best-looking day: ${formatDayLabel(bestDay.date)}`
+    ? `Best local setup this week: ${formatDayLabel(bestDay.date)}`
     : `Loaded ${daysData.length} days`;
 
   const initialDate = bestDay && bestDay.bestScore > 0 ? bestDay.date : enrichedDays[0] && enrichedDays[0].date;
@@ -1856,7 +1990,7 @@ function renderWeek(spot, daysData) {
 
   setSuccessState(
     bestDay
-      ? `Loaded ${daysData.length} days for ${spot.name}. Best current score: ${bestDay.bestScore} on ${formatDayLabel(bestDay.date)}.${currentLocalReport ? ` Local weekly read from ${currentLocalReport.weekOf || "this week"} is active.` : ""}`
+      ? `Loaded ${daysData.length} days for ${spot.name}. Top local setup is ${bestDay.bestScore} on ${formatDayLabel(bestDay.date)}, ranked ${bestDay.dayRank} of ${enrichedDays.length} for this pier.${currentLocalReport ? ` Local weekly read from ${currentLocalReport.weekOf || "this week"} is active as a small nudge.` : ""}`
       : `Loaded ${daysData.length} days for ${spot.name}, but no strong high-tide windows were found.`,
   );
 }
