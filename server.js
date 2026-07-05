@@ -416,6 +416,14 @@ function parseNdbcNumber(value) {
   return Number.isNaN(numeric) ? null : numeric;
 }
 
+function parseNdbcText(value) {
+  if (value === undefined || value === null || value === "MM") {
+    return null;
+  }
+
+  return String(value).replaceAll("_", " ").toLowerCase();
+}
+
 async function fetchBuoyConditions(stationId) {
   const [metText, specText] = await Promise.all([
     fetchPlainText(`${NDBC_BASE_URL}/${stationId}.txt`),
@@ -431,6 +439,12 @@ async function fetchBuoyConditions(stationId) {
   const dominantPeriodSeconds = parseNdbcNumber(spec.DPD);
   const meanWaveDirectionDegrees = parseNdbcNumber(spec.MWD);
   const significantWaveHeightMeters = parseNdbcNumber(spec.WVHT);
+  const swellHeightMeters = parseNdbcNumber(spec.SwH);
+  const swellPeriodSeconds = parseNdbcNumber(spec.SwP);
+  const swellDirectionDegrees = parseNdbcNumber(spec.SwD);
+  const windWaveHeightMeters = parseNdbcNumber(spec.WWH);
+  const windWavePeriodSeconds = parseNdbcNumber(spec.WWP);
+  const windWaveDirectionDegrees = parseNdbcNumber(spec.WWD);
 
   return {
     stationId,
@@ -439,6 +453,13 @@ async function fetchBuoyConditions(stationId) {
     dominantPeriodSeconds,
     meanWaveDirectionDegrees,
     significantWaveHeightFeet: significantWaveHeightMeters === null ? null : metersToFeet(significantWaveHeightMeters),
+    swellHeightFeet: swellHeightMeters === null ? null : metersToFeet(swellHeightMeters),
+    swellPeriodSeconds,
+    swellDirectionDegrees,
+    windWaveHeightFeet: windWaveHeightMeters === null ? null : metersToFeet(windWaveHeightMeters),
+    windWavePeriodSeconds,
+    windWaveDirectionDegrees,
+    waveSteepness: parseNdbcText(spec.STEEPNESS),
   };
 }
 

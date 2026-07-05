@@ -32,6 +32,8 @@ const SPOT_RULES = {
   santa_barbara: {
     label: "Stearns Wharf / Santa Barbara Harbor",
     exposure: "moderate",
+    commonWindPenaltyDirections: ["W", "WSW", "SW", "SSW"],
+    structureZones: ["outer end", "pilings", "harbor side"],
     incomingBonus: 4,
     summerEveningIncomingBonus: 4,
     outgoingPenalty: -2,
@@ -42,6 +44,8 @@ const SPOT_RULES = {
   goleta: {
     label: "Goleta Pier",
     exposure: "high",
+    commonWindPenaltyDirections: ["W", "WNW", "NW", "WSW", "SW"],
+    structureZones: ["surfline", "mid-pier", "pipeline side", "end"],
     incomingBonus: 3,
     summerEveningIncomingBonus: 1,
     outgoingPenalty: -5,
@@ -49,6 +53,15 @@ const SPOT_RULES = {
     hugeSwingPenalty: -3,
     moderateIncomingRange: [1, 2.8],
   },
+};
+
+const SPECIES_TEMP_PREFERENCES = {
+  mackerel: { cold: 58, ideal: 62 },
+  jacksmelt: { cold: 55, ideal: 59 },
+  surfperch: { cold: 54, ideal: 57 },
+  halibut: { cold: 60, ideal: 64 },
+  bat_ray: { cold: 57, ideal: 61 },
+  leopard_shark: { cold: 58, ideal: 62 },
 };
 
 const SPECIES_PROFILES = [
@@ -531,6 +544,215 @@ function describeTideMovement(recommendation) {
   };
 }
 
+function getDirectionPenalty(spotKey, windDirectionDegrees, windSpeedMph) {
+  if (windDirectionDegrees === null || windSpeedMph === null || windSpeedMph < 9) {
+    return { score: 0, note: "wind direction is not a major factor" };
+  }
+
+  const rules = SPOT_RULES[spotKey] || SPOT_RULES.santa_barbara;
+  const compass = degreesToCompass(windDirectionDegrees);
+
+  if (rules.commonWindPenaltyDirections.includes(compass)) {
+    const penalty = rules.exposure === "high" ? -6 : -3;
+    return {
+      score: penalty,
+      note: `${compass} wind can make this pier fish rougher`,
+    };
+  }
+
+  return { score: 1, note: `${compass || "variable"} wind direction is not a major penalty` };
+}
+
+function computeSwellEnergy(spotKey, conditions, buoyConditions = {}) {
+  const rules = SPOT_RULES[spotKey] || SPOT_RULES.santa_barbara;
+  const height = buoyConditions.significantWaveHeightFeet ?? conditions.waveHeightFeet;
+  const swellHeight = buoyConditions.swellHeightFeet;
+  const windWaveHeight = buoyConditions.windWaveHeightFeet;
+  const period = buoyConditions.swellPeriodSeconds ?? buoyConditions.dominantPeriodSeconds;
+  const steepness = buoyConditions.waveSteepness;
+  let score = 22;
+  const reasons = [];
+
+  if (height !== null && height !== undefined) {
+    if (height <= 2) {
+      score += 6;
+      reasons.push("low wave height");
+    } else if (height <= 3.5) {
+      score += 2;
+    } else if (height <= 5) {
+      score -= 5;
+      reasons.push("elevated wave height");
+    } else {
+      score -= 11;
+      reasons.push("heavy wave height");
+    }
+  }
+
+  if (period !== null && period !== undefined) {
+    if (period >= 13) {
+      score -= 8;
+      reasons.push("long-period swell can stir nearshore water");
+    } else if (period >= 10) {
+      score -= 4;
+      reasons.push("moderate swell period");
+    } else if (period >= 6) {
+      score += 2;
+    }
+  }
+
+  if (windWaveHeight !== null && windWaveHeight !== undefined && swellHeight !== null && swellHeight !== undefined && windWaveHeight > swellHeight) {
+    score -= rules.exposure === "high" ? 5 : 3;
+    reasons.push("local wind waves are stronger than the groundswell");
+  }
+
+  if (steepness && steepness.includes("steep")) {
+    score -= rules.exposure === "high" ? 7 : 4;
+    reasons.push("steeper waves point to choppier water");
+  }
+
+  if (rules.exposure === "high" && height !== null && height !== undefined && height > 3) {
+    score -= 4;
+    reasons.push("Goleta is more exposed to swell");
+  }
+
+  const boundedScore = clamp(Math.round(score), 4, 34);
+  let label = "Clean";
+  if (boundedScore < 14) {
+    label = "Messy";
+  } else if (boundedScore < 23) {
+    label = "Mixed";
+  }
+
+  return {
+    score: boundedScore,
+    label,
+    note: reasons.length ? reasons.slice(0, 2).join(", ") : "swell energy looks manageable",
+  };
+}
+
+function computeClarityRisk(spotKey, conditions, buoyConditions = {}, localInfluence = {}) {
+  const rules = SPOT_RULES[spotKey] || SPOT_RULES.santa_barbara;
+  const wind = conditions.windSpeedMph;
+  const wave = buoyConditions.significantWaveHeightFeet ?? conditions.waveHeightFeet;
+  const period = buoyConditions.swellPeriodSeconds ?? buoyConditions.dominantPeriodSeconds;
+  let risk = 18;
+  const reasons = [];
+
+  if (wind !== null && wind !== undefined && wind > 14) {
+    risk += rules.exposure === "high" ? 14 : 9;
+    reasons.push("strong wind can dirty the water");
+  } else if (wind !== null && wind !== undefined && wind > 10) {
+    risk += rules.exposure === "high" ? 8 : 5;
+  }
+
+  if (wave !== null && wave !== undefined && wave > 4) {
+    risk += 12;
+    reasons.push("larger surf can stir sediment");
+  } else if (wave !== null && wave !== undefined && wave > 3) {
+    risk += 7;
+  }
+
+  if (period !== null && period !== undefined && period >= 12) {
+    risk += 8;
+    reasons.push("longer-period swell can reach the bottom harder");
+  }
+
+  if ((localInfluence.clarityAdjustment || 0) < 0) {
+    risk += 12;
+    reasons.push("local report flags poorer clarity");
+  }
+
+  if (spotKey === "goleta") {
+    risk += 4;
+  }
+
+  const boundedRisk = clamp(Math.round(risk), 0, 100);
+  let label = "Low";
+  if (boundedRisk >= 55) {
+    label = "High";
+  } else if (boundedRisk >= 34) {
+    label = "Moderate";
+  }
+
+  return {
+    score: boundedRisk,
+    penalty: label === "High" ? -9 : label === "Moderate" ? -4 : 1,
+    label,
+    note: reasons.length ? reasons.slice(0, 2).join(", ") : "no major clarity warning from wind or swell",
+  };
+}
+
+function scoreTemperatureForSpecies(speciesKey, waterTempF) {
+  const preference = SPECIES_TEMP_PREFERENCES[speciesKey];
+  if (!preference || waterTempF === null || waterTempF === undefined) {
+    return { adjustment: 0, label: "Unknown" };
+  }
+
+  if (waterTempF >= preference.ideal) {
+    return { adjustment: 7, label: "Favorable" };
+  }
+  if (waterTempF >= preference.cold) {
+    return { adjustment: 1, label: "Usable" };
+  }
+  return { adjustment: -9, label: "Cold" };
+}
+
+function computeBaitfishConfidence(baitfishIndex, localInfluence = {}, clarityRisk = null, swellEnergy = null) {
+  let score = baitfishIndex ? baitfishIndex.score : 35;
+  const reasons = [];
+
+  if ((localInfluence.baitfishAdjustment || 0) > 0) {
+    score += 8;
+    reasons.push("local report supports bait presence");
+  }
+  if ((localInfluence.baitfishAdjustment || 0) < 0) {
+    score -= 10;
+    reasons.push("local report says bait is thin");
+  }
+  if (clarityRisk && clarityRisk.label === "High") {
+    score -= 12;
+    reasons.push("dirty-water risk lowers bait confidence");
+  }
+  if (swellEnergy && swellEnergy.label === "Messy") {
+    score -= 8;
+    reasons.push("messier swell lowers bait confidence");
+  }
+
+  const boundedScore = clamp(Math.round(score), 0, 100);
+  let label = "Low";
+  if (boundedScore >= 76) {
+    label = "High";
+  } else if (boundedScore >= 56) {
+    label = "Medium";
+  }
+
+  return {
+    score: boundedScore,
+    label,
+    note: reasons.length ? reasons.slice(0, 2).join(", ") : "bait confidence is based on conditions rather than a direct live report",
+  };
+}
+
+function recommendPierZone(spotKey, recommendation) {
+  if (spotKey === "goleta") {
+    if (recommendation.waterStability?.label === "Turbulent" || recommendation.clarityRisk?.label === "High") {
+      return { label: "Mid-pier only if it settles", detail: "Goleta is exposed, so avoid reading a strong tide as enough by itself." };
+    }
+    if (recommendation.tidePhase === "incoming" && recommendation.baitfishConfidence?.label !== "Low") {
+      return { label: "Mid-pier to end", detail: "Moderate incoming water with bait support fits Goleta best." };
+    }
+    return { label: "Surfline or mid-pier", detail: "Keep the plan flexible until bait or cleaner water shows." };
+  }
+
+  if (recommendation.baitfishConfidence?.label === "High" || recommendation.tripType?.label === "Baitfish Window") {
+    return { label: "Outer end", detail: "Stearns usually favors the outer end for sabiki and baitfish-style fishing." };
+  }
+  if (recommendation.tripType?.label === "Predator Window") {
+    return { label: "Outer end edges", detail: "Cleaner moving water near the outer-end edges fits live bait or lure work." };
+  }
+  return { label: "Outer end first", detail: "Start where the wharf has the most depth and adjust if you see bait flashing elsewhere." };
+}
+
 function dayDifference(fromDate, toDate) {
   const start = new Date(`${fromDate}T00:00:00`);
   const end = new Date(`${toDate}T00:00:00`);
@@ -974,6 +1196,7 @@ function computeWaterStability(recommendation) {
   const rules = SPOT_RULES[recommendation.spotKey] || SPOT_RULES.santa_barbara;
   const wind = recommendation.conditions.windSpeedMph;
   const wave = recommendation.conditions.waveHeightFeet;
+  const directionPenalty = getDirectionPenalty(recommendation.spotKey, recommendation.conditions.windDirectionDegrees, wind);
   let score = 18;
   const reasons = [];
 
@@ -1035,6 +1258,20 @@ function computeWaterStability(recommendation) {
   if (recommendation.localInfluence && recommendation.localInfluence.clarityAdjustment < 0 && rules.exposure === "high") {
     score += recommendation.localInfluence.clarityAdjustment * 1.5;
     reasons.push("local dirty-water report matters more here");
+  }
+
+  score += directionPenalty.score;
+  if (directionPenalty.score < 0) {
+    reasons.push(directionPenalty.note);
+  }
+
+  if (recommendation.swellEnergy) {
+    if (recommendation.swellEnergy.label === "Messy") {
+      score -= rules.exposure === "high" ? 8 : 5;
+      reasons.push(recommendation.swellEnergy.note);
+    } else if (recommendation.swellEnergy.label === "Clean") {
+      score += 3;
+    }
   }
 
   const boundedScore = Math.max(4, Math.min(36, Math.round(score)));
@@ -1200,6 +1437,14 @@ function applySpotSpeciesAdjustments(species, recommendation) {
         }
       }
 
+      const tempFit = scoreTemperatureForSpecies(entry.key, recommendation.buoyConditions?.waterTempF);
+      score += tempFit.adjustment;
+      if (tempFit.label === "Cold") {
+        reasons.push(`${entry.label} temperature fit looks cold`);
+      } else if (tempFit.label === "Favorable") {
+        reasons.push(`${entry.label} temperature fit looks favorable`);
+      }
+
       return {
         ...entry,
         score: Math.max(0, Math.min(100, Math.round(score))),
@@ -1214,12 +1459,14 @@ function applySpotSpeciesAdjustments(species, recommendation) {
 function inferTripType(recommendation) {
   const topSpecies = recommendation.species || [];
   const baitfishIndex = recommendation.baitfishIndex || computeBaitfishIndex(recommendation);
+  const baitfishConfidence = recommendation.baitfishConfidence || { label: "Low", score: baitfishIndex.score };
   const localInfluence = recommendation.localInfluence || {};
 
   if (
     (localInfluence.scoreAdjustment || 0) <= -8 ||
     (localInfluence.baitfishAdjustment || 0) <= -14 ||
-    recommendation.waterStability?.label === "Turbulent"
+    recommendation.waterStability?.label === "Turbulent" ||
+    recommendation.clarityRisk?.label === "High"
   ) {
     return {
       label: "Scratch Session",
@@ -1227,14 +1474,14 @@ function inferTripType(recommendation) {
     };
   }
 
-  if (recommendation.sabikiCurrentPenalty <= -4 && baitfishIndex.score >= 55) {
+  if (recommendation.sabikiCurrentPenalty <= -4 && baitfishConfidence.label !== "Low") {
     return {
       label: "Cast-Through Window",
       detail: "Bait may still be around, but the current looks too hard for an easy straight-down sabiki session.",
     };
   }
 
-  if (baitfishIndex.score >= 82) {
+  if (baitfishIndex.score >= 82 && baitfishConfidence.label === "High") {
     return {
       label: "Baitfish Window",
       detail: "Best for sabiki rigs, light baitfish action, and a fun mixed-family session.",
@@ -1459,6 +1706,7 @@ function buildRecommendations(dayData, weatherSeries) {
         conditions: windowConditions,
         buoyConditions,
       });
+      const swellEnergy = computeSwellEnergy(dayData.spotKey, windowConditions, buoyConditions);
       const waterStability = computeWaterStability({
         spotKey: dayData.spotKey,
         highTime: parseDateValue(high.t),
@@ -1468,7 +1716,9 @@ function buildRecommendations(dayData, weatherSeries) {
         tidePhase,
         conditions: windowConditions,
         localInfluence,
+        swellEnergy,
       });
+      const clarityRisk = computeClarityRisk(dayData.spotKey, windowConditions, buoyConditions, localInfluence);
       const spotAdjustments = computeSpotAdjustments(
         {
           spotKey: dayData.spotKey,
@@ -1485,8 +1735,10 @@ function buildRecommendations(dayData, weatherSeries) {
       );
       const rawWindowSignals = {
         waterStability: waterStability.score,
+        swellEnergy: swellEnergy.score,
+        clarityQuality: 100 - clarityRisk.score,
         tideSetup: Math.round(tideScore + ((incomingSwing + outgoingSwing) * 1.2)),
-        baitOpportunity: baseBaitfishIndex.score,
+        baitOpportunity: Math.round((baseBaitfishIndex.score * 0.65) + (baitfishConfidence.score * 0.35)),
         fishableTiming: Math.round((lightScore * 1.2) + daylightScore + (windowConditions.daylightRatio * 18)),
       };
       const spotAdjustedSignals = {
@@ -1495,9 +1747,12 @@ function buildRecommendations(dayData, weatherSeries) {
         sabikiCurrentPenalty: spotAdjustments.sabikiCurrentPenalty,
         coldWaterPenalty: waterTempPenalty,
         swellPenalty,
+        clarityPenalty: clarityRisk.penalty,
       };
       const rawComposite =
-        (rawWindowSignals.waterStability * 0.95) +
+        (rawWindowSignals.waterStability * 0.72) +
+        (rawWindowSignals.swellEnergy * 0.42) +
+        (rawWindowSignals.clarityQuality * 0.12) +
         (rawWindowSignals.tideSetup * 0.42) +
         ((rawWindowSignals.baitOpportunity - 50) * (dayData.spotKey === "goleta" ? 0.18 : 0.12)) +
         (rawWindowSignals.fishableTiming * 0.78) +
@@ -1505,7 +1760,8 @@ function buildRecommendations(dayData, weatherSeries) {
         spotAdjustedSignals.baitPresenceAdjustment +
         spotAdjustedSignals.sabikiCurrentPenalty +
         spotAdjustedSignals.coldWaterPenalty +
-        spotAdjustedSignals.swellPenalty;
+        spotAdjustedSignals.swellPenalty +
+        spotAdjustedSignals.clarityPenalty;
       const baseScore = Math.round(rawComposite);
       const score = baseScore;
       const baitfishScore = Math.max(0, Math.min(100, baseBaitfishIndex.score + localInfluence.baitfishAdjustment));
@@ -1515,6 +1771,7 @@ function buildRecommendations(dayData, weatherSeries) {
         baseScore: baseBaitfishIndex.score,
         localAdjustment: localInfluence.baitfishAdjustment,
       };
+      const baitfishConfidence = computeBaitfishConfidence(baitfishIndex, localInfluence, clarityRisk, swellEnergy);
       const species = applySpotSpeciesAdjustments(inferSpeciesForWindow({
         highTime: parseDateValue(high.t),
         highHeight: high.numericValue,
@@ -1536,22 +1793,36 @@ function buildRecommendations(dayData, weatherSeries) {
         score,
         conditions: windowConditions,
         baitfishIndex,
+        baitfishConfidence,
         buoyConditions,
         localInfluence,
         waterStability,
+        swellEnergy,
+        clarityRisk,
       }), {
         spotKey: dayData.spotKey,
         highTime: parseDateValue(high.t),
         tidePhase,
         waterStability,
         baitfishIndex,
+        baitfishConfidence,
+        buoyConditions,
       });
       const tripType = inferTripType({
         species,
         baitfishIndex,
+        baitfishConfidence,
         waterStability,
+        clarityRisk,
         sabikiCurrentPenalty: spotAdjustments.sabikiCurrentPenalty,
         localInfluence,
+      });
+      const pierZone = recommendPierZone(dayData.spotKey, {
+        tidePhase,
+        waterStability,
+        clarityRisk,
+        baitfishConfidence,
+        tripType,
       });
 
       return {
@@ -1572,6 +1843,8 @@ function buildRecommendations(dayData, weatherSeries) {
         waterTempPenalty,
         swellPenalty,
         waterStability,
+        swellEnergy,
+        clarityRisk,
         tideDirectionAdjustment: spotAdjustments.tideDirectionAdjustment,
         baitPresenceAdjustment: spotAdjustments.baitPresenceAdjustment,
         sabikiCurrentPenalty: spotAdjustments.sabikiCurrentPenalty,
@@ -1585,8 +1858,10 @@ function buildRecommendations(dayData, weatherSeries) {
         conditions: windowConditions,
         buoyConditions,
         baitfishIndex,
+        baitfishConfidence,
         species,
         tripType,
+        pierZone,
         localInfluence,
       };
     })
@@ -1730,13 +2005,17 @@ function renderRecommendations(dayData, recommendations) {
       createFact("Incoming swing", toFeet(recommendation.incomingSwing)),
       createFact("Outgoing swing", toFeet(recommendation.outgoingSwing)),
       createFact("Water stability", `${recommendation.waterStability.label} (${recommendation.waterStability.score})`),
+      createFact("Swell energy", `${recommendation.swellEnergy.label} (${recommendation.swellEnergy.score})`),
+      createFact("Clarity risk", `${recommendation.clarityRisk.label} (${recommendation.clarityRisk.score})`),
       createFact("Daylight fit", `${Math.round(recommendation.conditions.daylightRatio * 100)}% of window in daylight`),
       createFact("Daylight priority", recommendation.daylightAlternativePenalty ? String(recommendation.daylightAlternativePenalty) : "0"),
       createFact("Wind", `${toMph(recommendation.conditions.windSpeedMph)}${recommendation.conditions.windDirectionDegrees !== null ? ` ${degreesToCompass(recommendation.conditions.windDirectionDegrees)} (${Number(recommendation.conditions.windDirectionDegrees).toFixed(0)}°)` : ""}`),
       createFact("Wave height", toFeet(recommendation.conditions.waveHeightFeet)),
       createFact("Light window", lightWindow),
       createFact("Baitfish index", `${recommendation.baitfishIndex.label} (${recommendation.baitfishIndex.score})`),
+      createFact("Bait confidence", `${recommendation.baitfishConfidence.label} (${recommendation.baitfishConfidence.score})`),
       createFact("Trip type", recommendation.tripType.label),
+      createFact("Pier zone", recommendation.pierZone ? recommendation.pierZone.label : "Flexible"),
       createFact("Spot rule", recommendation.spotReasons && recommendation.spotReasons.length ? recommendation.spotReasons[0] : "No major spot-specific shift"),
       createFact("Low tide context", `Day's lowest low: ${toFeet(nearestLow)}`),
       createFact("Likely species", recommendation.species.map((species) => species.label).join(", ")),
@@ -1783,6 +2062,20 @@ function renderConditions(dayData, spot) {
       topRecommendation
         ? `${SPOT_RULES[dayData.spotKey || spotSelect.value]?.label || "This spot"} reads ${topRecommendation.waterStability.label.toLowerCase()} right now because ${topRecommendation.waterStability.note}.`
         : "A stability read will appear once the top window is scored.",
+    ),
+    createConditionCard(
+      "Swell energy",
+      topRecommendation ? topRecommendation.swellEnergy.label : "Still evaluating",
+      topRecommendation
+        ? `${topRecommendation.swellEnergy.note}. This uses buoy swell/wind-wave context where available, not just the forecast wave-height number.`
+        : "Swell energy will appear once the top window is scored.",
+    ),
+    createConditionCard(
+      "Clarity risk",
+      topRecommendation ? topRecommendation.clarityRisk.label : "Still evaluating",
+      topRecommendation
+        ? topRecommendation.clarityRisk.note
+        : "Clarity risk will appear once wind, swell, and local-report context are scored.",
     ),
     createConditionCard(
       "Tide phase",
@@ -1832,9 +2125,23 @@ function renderConditions(dayData, spot) {
         : "Waiting on a clearer signal from the day's best window.",
     ),
     createConditionCard(
+      "Bait confidence",
+      topRecommendation ? `${topRecommendation.baitfishConfidence.label} ${topRecommendation.baitfishConfidence.score}` : "Unavailable",
+      topRecommendation
+        ? topRecommendation.baitfishConfidence.note
+        : "Waiting on the baitfish confidence read.",
+    ),
+    createConditionCard(
       "Trip type",
       tripType ? tripType.label : "Still evaluating",
       tripType ? tripType.detail : "Trip style will appear once the day is scored.",
+    ),
+    createConditionCard(
+      "Pier zone",
+      topRecommendation && topRecommendation.pierZone ? topRecommendation.pierZone.label : "Flexible",
+      topRecommendation && topRecommendation.pierZone
+        ? topRecommendation.pierZone.detail
+        : "The app will suggest a pier zone once a top window is scored.",
     ),
   );
 }
