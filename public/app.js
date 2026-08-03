@@ -283,6 +283,11 @@ function parseDateValue(value) {
   }
 
   if (typeof value === "string") {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const [year, month, day] = value.split("-").map(Number);
+      return new Date(year, month - 1, day);
+    }
+
     return new Date(value.includes("T") ? value : `${value.replace(" ", "T")}`);
   }
 
@@ -1733,6 +1738,14 @@ function buildRecommendations(dayData, weatherSeries) {
         },
         baseBaitfishIndex.score,
       );
+      const baitfishScore = Math.max(0, Math.min(100, baseBaitfishIndex.score + localInfluence.baitfishAdjustment));
+      const baitfishIndex = {
+        score: baitfishScore,
+        label: baitfishLabel(baitfishScore),
+        baseScore: baseBaitfishIndex.score,
+        localAdjustment: localInfluence.baitfishAdjustment,
+      };
+      const baitfishConfidence = computeBaitfishConfidence(baitfishIndex, localInfluence, clarityRisk, swellEnergy);
       const rawWindowSignals = {
         waterStability: waterStability.score,
         swellEnergy: swellEnergy.score,
@@ -1764,14 +1777,6 @@ function buildRecommendations(dayData, weatherSeries) {
         spotAdjustedSignals.clarityPenalty;
       const baseScore = Math.round(rawComposite);
       const score = baseScore;
-      const baitfishScore = Math.max(0, Math.min(100, baseBaitfishIndex.score + localInfluence.baitfishAdjustment));
-      const baitfishIndex = {
-        score: baitfishScore,
-        label: baitfishLabel(baitfishScore),
-        baseScore: baseBaitfishIndex.score,
-        localAdjustment: localInfluence.baitfishAdjustment,
-      };
-      const baitfishConfidence = computeBaitfishConfidence(baitfishIndex, localInfluence, clarityRisk, swellEnergy);
       const species = applySpotSpeciesAdjustments(inferSpeciesForWindow({
         highTime: parseDateValue(high.t),
         highHeight: high.numericValue,

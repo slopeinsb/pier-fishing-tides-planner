@@ -268,6 +268,10 @@ function metersToFeet(value) {
   return value === null ? null : value * 3.28084;
 }
 
+function celsiusToFahrenheit(value) {
+  return value === null ? null : (value * 9 / 5) + 32;
+}
+
 function kmhToMph(value) {
   return value === null ? null : value * 0.621371;
 }
@@ -435,7 +439,7 @@ async function fetchBuoyConditions(stationId) {
   const met = metRows[0] || {};
   const spec = specRows[0] || {};
 
-  const waterTempF = parseNdbcNumber(met.WTMP);
+  const waterTempC = parseNdbcNumber(met.WTMP);
   const dominantPeriodSeconds = parseNdbcNumber(spec.DPD);
   const meanWaveDirectionDegrees = parseNdbcNumber(spec.MWD);
   const significantWaveHeightMeters = parseNdbcNumber(spec.WVHT);
@@ -449,7 +453,8 @@ async function fetchBuoyConditions(stationId) {
   return {
     stationId,
     observedAtUtc: met["#YY"] ? `${met["#YY"]}-${met.MM}-${met.DD}T${met.hh}:${met.mm}:00Z` : null,
-    waterTempF,
+    waterTempF: celsiusToFahrenheit(waterTempC),
+    waterTempC,
     dominantPeriodSeconds,
     meanWaveDirectionDegrees,
     significantWaveHeightFeet: significantWaveHeightMeters === null ? null : metersToFeet(significantWaveHeightMeters),
