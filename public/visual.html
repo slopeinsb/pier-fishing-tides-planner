@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pier Fishing Visual</title>
+    <link rel="stylesheet" href="/visual.css" />
+  </head>
+  <body>
+    <main class="visual-shell">
+      <section class="visual-board" aria-label="Pier fishing visual dashboard">
+        <div class="station-tab">Pier Visual</div>
+
+        <header class="visual-header">
+          <div>
+            <p class="eyebrow">Fishing companion</p>
+            <h1 id="visual-title">Loading pier conditions</h1>
+            <p id="visual-subtitle">Fetching the local outlook...</p>
+          </div>
+          <form id="visual-form" class="visual-form">
+            <label>
+              Spot
+              <select id="visual-spot" name="spot" aria-label="Spot">
+                <option value="santa_barbara">Santa Barbara</option>
+                <option value="goleta">Goleta</option>
+              </select>
+            </label>
+            <label>
+              Day
+              <input id="visual-date" name="date" type="date" aria-label="Day" />
+            </label>
+            <button type="submit">Load day</button>
+          </form>
+        </header>
+
+        <section class="top-grid">
+          <article class="dial-card">
+            <p class="label">wind direction</p>
+            <div id="wind-dial" class="direction-dial" aria-label="Wind direction dial">
+              <span class="north">N</span>
+              <i class="ray n"></i>
+              <i class="ray ne"></i>
+              <i class="ray e"></i>
+              <i class="ray se"></i>
+              <i class="ray s"></i>
+              <i class="ray sw"></i>
+              <i class="ray w"></i>
+              <i class="ray nw"></i>
+              <b id="wind-needle"></b>
+            </div>
+          </article>
+
+          <article class="marine-card">
+            <div class="boat-mark" aria-hidden="true">
+              <span class="cloud one"></span>
+              <span class="cloud two"></span>
+              <span class="boat"></span>
+              <span class="wave one"></span>
+              <span class="wave two"></span>
+            </div>
+            <div class="condition-bar" id="marine-bar"></div>
+            <h2 id="marine-label">Marine Conditions</h2>
+            <p id="marine-note">Waiting for data</p>
+          </article>
+        </section>
+
+        <section class="scale-stack">
+          <div class="scale-row">
+            <p class="scale-title">wind: speed</p>
+            <div id="wind-scale" class="scale"></div>
+          </div>
+
+          <div class="scale-row">
+            <p class="scale-title">wave: height (ft) & period (s)</p>
+            <div id="wave-scale" class="scale double"></div>
+          </div>
+        </section>
+
+        <section class="middle-grid">
+          <article class="dial-card compact">
+            <p class="label">wave direction</p>
+            <div class="direction-dial small" aria-label="Wave direction dial">
+              <span class="north">N</span>
+              <i class="ray n"></i>
+              <i class="ray ne"></i>
+              <i class="ray e"></i>
+              <i class="ray se"></i>
+              <i class="ray s"></i>
+              <i class="ray sw"></i>
+              <i class="ray w"></i>
+              <i class="ray nw"></i>
+              <b id="wave-needle"></b>
+            </div>
+          </article>
+
+          <article class="icon-card">
+            <p class="label right">conditions</p>
+            <div id="condition-icons" class="condition-icons" aria-label="Condition indicators"></div>
+          </article>
+        </section>
+
+        <section class="metric-grid">
+          <article>
+            <p class="scale-title">barometric pressure</p>
+            <div class="pressure-row">
+              <span class="ghost">⌄</span>
+              <span class="active-gauge">◌</span>
+              <span class="ghost">⌃</span>
+            </div>
+            <div class="pressure-labels">
+              <span>falling</span>
+              <span>steady</span>
+              <span>rising</span>
+            </div>
+          </article>
+
+          <article>
+            <p class="scale-title">visibility (mi)</p>
+            <div id="visibility-scale" class="scale green"></div>
+          </article>
+
+          <article class="wide">
+            <p class="scale-title">water temperature (°F)</p>
+            <div id="temp-scale" class="scale temp"></div>
+          </article>
+        </section>
+
+        <section class="tide-visual">
+          <div class="tide-label left">low</div>
+          <div class="tide-label top">high</div>
+          <div class="tide-label right">low</div>
+          <svg viewBox="0 0 900 430" role="img" aria-label="Tide level curve">
+            <path class="tide-fill" d="M0,380 C150,360 230,180 330,120 C470,35 610,95 705,220 C785,325 840,360 900,380 L900,430 L0,430 Z" />
+            <path class="tide-line" d="M0,380 C150,360 230,180 330,120 C470,35 610,95 705,220 C785,325 840,360 900,380" />
+            <path class="tide-window-path" d="M95,390 C210,350 280,210 380,150 C505,75 640,130 740,270 C800,350 835,385 875,392" />
+            <circle id="tide-start-dot" class="tide-dot start" cx="95" cy="390" r="13" />
+            <circle id="tide-end-dot" class="tide-dot end" cx="875" cy="392" r="13" />
+          </svg>
+          <div class="tide-clock">
+            <div class="clock-face" id="clock-face"></div>
+            <p>tide clock</p>
+          </div>
+          <div class="tide-meta">
+            <span id="best-window">Best window: --</span>
+            <span id="high-tide">High tide: --</span>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/visual.js"></script>
+  </body>
+</html>

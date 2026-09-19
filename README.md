@@ -13,6 +13,7 @@ For the product plan and application specification, see [docs/application-spec.m
 - Lets you click any day to inspect its best high-tide windows in detail.
 - Suggests the most likely species mix for each window and each day.
 - Lets you add a manual weekly local fishing report layer that can nudge the score, baitfish read, and method advice.
+- Includes a bookmarkable single-day visual dashboard at `/visual.html` for a quick at-a-glance pier conditions read.
 - Ranks windows using:
   - high-tide height relative to the rest of the day
   - the size of the swing from nearby low tides

@@ -114,6 +114,17 @@ button {
   line-height: 1.5;
 }
 
+.visual-link-row {
+  margin: 0.85rem 0 0;
+}
+
+.visual-link {
+  color: var(--sea-deep);
+  font-weight: 800;
+  text-decoration-thickness: 0.12em;
+  text-underline-offset: 0.25em;
+}
+
 .week-panel {
   margin-top: 1rem;
   padding: 1.2rem;
