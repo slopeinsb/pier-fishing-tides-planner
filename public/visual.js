@@ -3,17 +3,14 @@ const spotSelect = document.querySelector("#visual-spot");
 const dateInput = document.querySelector("#visual-date");
 const title = document.querySelector("#visual-title");
 const subtitle = document.querySelector("#visual-subtitle");
-const windNeedle = document.querySelector("#wind-needle");
-const waveNeedle = document.querySelector("#wave-needle");
-const marineBar = document.querySelector("#marine-bar");
-const marineLabel = document.querySelector("#marine-label");
-const marineNote = document.querySelector("#marine-note");
 const windScale = document.querySelector("#wind-scale");
 const waveScale = document.querySelector("#wave-scale");
 const visibilityScale = document.querySelector("#visibility-scale");
 const tempScale = document.querySelector("#temp-scale");
-const conditionIcons = document.querySelector("#condition-icons");
-const clockFace = document.querySelector("#clock-face");
+const tideProgressLine = document.querySelector("#tide-progress-line");
+const tideNowMarker = document.querySelector("#tide-now-marker");
+const tidePhase = document.querySelector("#tide-phase");
+const tideStage = document.querySelector("#tide-stage");
 const bestWindow = document.querySelector("#best-window");
 const highTide = document.querySelector("#high-tide");
 
@@ -102,14 +99,6 @@ function nearestIndex(values, value) {
   }, 0);
 }
 
-function setNeedle(element, degrees) {
-  if (!element || degrees === null || degrees === undefined || Number.isNaN(Number(degrees))) {
-    return;
-  }
-
-  element.style.setProperty("--needle-angle", `${Number(degrees) - 90}deg`);
-}
-
 function renderScale(container, values, activeValue, options = {}) {
   const activeIndex = nearestIndex(values, activeValue);
   container.style.setProperty("--items", values.length);
@@ -161,51 +150,6 @@ function renderWaveScale(container, heightValues, periodValues, height, period) 
   });
 }
 
-function conditionRead(day) {
-  const wind = day.dailyConditions?.windSpeedMph;
-  const buoy = day.buoyConditions || {};
-  const wave = buoy.significantWaveHeightFeet ?? day.dailyConditions?.waveHeightFeet;
-  const temp = buoy.waterTempF;
-  const localReport = day.localReport || {};
-  let score = 0;
-
-  if (wind !== null && wind !== undefined) {
-    score += wind > 14 ? 2 : wind > 10 ? 1 : 0;
-  }
-  if (wave !== null && wave !== undefined) {
-    score += wave > 4 ? 2 : wave > 3 ? 1 : 0;
-  }
-  if (temp !== null && temp !== undefined) {
-    score += temp < 58 ? 2 : temp < 62 ? 1 : 0;
-  }
-  if (localReport.waterClarity === "poor") {
-    score += 1;
-  }
-
-  if (score >= 4) {
-    return {
-      label: "Scratchy",
-      color: "#f4510b",
-      note: "Keep expectations low; water quality or comfort may be the limiter.",
-      iconClass: "warning",
-    };
-  }
-  if (score >= 2) {
-    return {
-      label: "Mixed",
-      color: "#ffbd42",
-      note: "Some usable pieces, but check the tide window before committing.",
-      iconClass: "active",
-    };
-  }
-  return {
-    label: "Clean",
-    color: "#46ee1c",
-    note: "Conditions look manageable for a family pier session.",
-    iconClass: "active",
-  };
-}
-
 function chooseHighTide(day) {
   const highs = (day.highLowPredictions || [])
     .filter((prediction) => prediction.type === "H")
@@ -249,55 +193,112 @@ function windowLabel(high) {
   return `${formatTime(start)}-${formatTime(end)}`;
 }
 
-function renderConditionIcons(read) {
-  const icons = [
-    { icon: "☀", active: true },
-    { icon: "☾", active: false },
-    { icon: "ϟ", active: false },
-    { icon: "♒", active: read.label !== "Clean" },
-    { icon: "☁", active: read.label === "Mixed" },
-    { icon: "≋", active: read.label === "Scratchy" },
-    { icon: "❄", active: false },
-    { icon: "⚠", active: read.label === "Scratchy", warning: true },
-  ];
+function tideGraphPoint(progress, phase) {
+  const clamped = Math.max(0, Math.min(1, progress));
 
-  conditionIcons.innerHTML = "";
-  icons.forEach((item) => {
-    const span = document.createElement("span");
-    span.textContent = item.icon;
-    if (item.active) {
-      span.className = item.warning ? "warning" : read.iconClass;
-    }
-    conditionIcons.append(span);
-  });
+  if (phase === "flood") {
+    const x = 95 + (355 * clamped);
+    const y = 390 - (270 * Math.sin((clamped * Math.PI) / 2));
+    return { x, y };
+  }
+
+  const x = 450 + (425 * clamped);
+  const y = 120 + (272 * (1 - Math.cos((clamped * Math.PI) / 2)));
+  return { x, y };
 }
 
-function renderClock(high) {
-  clockFace.innerHTML = "";
-  const activeHour = high ? (high.time.getHours() % 12 || 12) : 12;
+function tideProgressPoints(progress, phase) {
+  const points = [];
+  const steps = Math.max(2, Math.round(progress * 18));
+  for (let index = 0; index <= steps; index += 1) {
+    const stepProgress = progress * (index / steps);
+    const point = tideGraphPoint(stepProgress, phase);
+    points.push(`${point.x.toFixed(1)},${point.y.toFixed(1)}`);
+  }
+  return points.join(" ");
+}
 
-  for (let index = 0; index < 24; index += 1) {
-    const tick = document.createElement("i");
-    const hour = (index % 12) || 12;
-    tick.className = `tick${index % 2 === 0 ? " major" : ""}`;
-    tick.style.transform = `rotate(${index * 15}deg)`;
-    if (hour === activeHour || hour === activeHour - 1 || hour === activeHour + 1) {
-      tick.classList.add("active-good");
-    }
-    clockFace.append(tick);
+function currentTimeOnSelectedDate(day) {
+  const selectedDate = safeDate(day.date);
+  if (!selectedDate) {
+    return new Date();
   }
 
-  for (let hour = 1; hour <= 12; hour += 1) {
-    const number = document.createElement("span");
-    const angle = ((hour % 12) * 30) - 90;
-    const radius = 72;
-    const x = Math.cos((angle * Math.PI) / 180) * radius;
-    const y = Math.sin((angle * Math.PI) / 180) * radius;
-    number.className = "clock-number";
-    number.textContent = String(hour);
-    number.style.transform = `translate(${x - 6}px, ${y - 8}px)`;
-    clockFace.append(number);
+  const now = new Date();
+  selectedDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+  return selectedDate;
+}
+
+function surroundingTideStage(day, high) {
+  if (!high) {
+    return null;
   }
+
+  const now = currentTimeOnSelectedDate(day);
+  const predictions = (day.highLowPredictions || [])
+    .map((prediction) => ({
+      time: safeDate(prediction.t),
+      height: Number(prediction.v),
+      type: prediction.type,
+    }))
+    .filter((prediction) => prediction.time)
+    .sort((left, right) => left.time - right.time);
+
+  const previousEvent = [...predictions].reverse().find((prediction) => prediction.time <= now);
+  const nextEvent = predictions.find((prediction) => prediction.time > now);
+
+  if (previousEvent && nextEvent) {
+    const duration = nextEvent.time - previousEvent.time;
+    const progress = duration > 0 ? (now - previousEvent.time) / duration : 0;
+    const phase = nextEvent.type === "H" ? "flood" : "ebb";
+    return {
+      phase,
+      progress: Math.max(0, Math.min(1, progress)),
+      now,
+      from: previousEvent,
+      to: nextEvent,
+    };
+  }
+
+  if (nextEvent) {
+    return {
+      phase: nextEvent.type === "H" ? "flood" : "ebb",
+      progress: 0,
+      now,
+      from: null,
+      to: nextEvent,
+    };
+  }
+
+  return {
+    phase: previousEvent?.type === "H" ? "ebb" : "flood",
+    progress: 1,
+    now,
+    from: previousEvent,
+    to: null,
+  };
+}
+
+function renderTideProgress(day, high) {
+  const stage = surroundingTideStage(day, high);
+  if (!stage) {
+    tideNowMarker.setAttribute("transform", "translate(450 120)");
+    tideProgressLine.setAttribute("points", "");
+    tidePhase.textContent = "Tide phase: --";
+    tideStage.textContent = "No tide stage available.";
+    return;
+  }
+
+  const point = tideGraphPoint(stage.progress, stage.phase);
+  tideNowMarker.setAttribute("transform", `translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})`);
+  tideProgressLine.setAttribute("points", tideProgressPoints(stage.progress, stage.phase));
+  tideProgressLine.classList.toggle("ebb", stage.phase === "ebb");
+  tideProgressLine.classList.toggle("flood", stage.phase === "flood");
+
+  const direction = stage.phase === "flood" ? "incoming toward high tide" : "outgoing after high tide";
+  const percent = Math.round(stage.progress * 100);
+  tidePhase.textContent = `Now: ${formatTime(stage.now)} • ${direction}`;
+  tideStage.textContent = `${percent}% through this ${stage.phase === "flood" ? "incoming" : "outgoing"} tide segment`;
 }
 
 function renderDashboard(data) {
@@ -309,22 +310,13 @@ function renderDashboard(data) {
   day.localReport = data.localReport;
   const high = chooseHighTide(day);
   const buoy = day.buoyConditions || {};
-  const condition = conditionRead(day);
   const waveHeight = buoy.significantWaveHeightFeet ?? day.dailyConditions?.waveHeightFeet;
   const wavePeriod = buoy.swellPeriodSeconds ?? buoy.dominantPeriodSeconds;
-  const waveDirection = buoy.swellDirectionDegrees ?? buoy.meanWaveDirectionDegrees;
   const wind = day.dailyConditions?.windSpeedMph;
-  const windDirection = day.dailyConditions?.windDirectionDegrees;
   const waterTemp = buoy.waterTempF;
 
   title.textContent = `${SPOT_LABELS[data.spot?.id] || data.spot?.name || "Pier"} • ${formatDate(day.date)}`;
-  subtitle.textContent = `${condition.label} marine read • sunrise ${formatTime(day.sunTimes.sunrise)} • sunset ${formatTime(day.sunTimes.sunset)}`;
-  marineLabel.textContent = `${condition.label} Conditions`;
-  marineNote.textContent = condition.note;
-  marineBar.style.background = condition.color;
-
-  setNeedle(windNeedle, windDirection);
-  setNeedle(waveNeedle, waveDirection);
+  subtitle.textContent = `Sunrise ${formatTime(day.sunTimes.sunrise)} • sunset ${formatTime(day.sunTimes.sunset)}`;
 
   renderScale(windScale, [2, 4, 6, 8, 10, 15, 20, 25, 30, 40, 50], wind);
   renderWaveScale(waveScale, [2, 3, 4, 5, 6, 8, 10, 12, 14, 16, 18], [2, 3, 4, 5, 6, 8, 10, 12, 14, 16, 18], waveHeight, wavePeriod);
@@ -334,8 +326,7 @@ function renderDashboard(data) {
     },
   });
   renderScale(tempScale, [40, 50, 55, 60, 65, 70, 75, 80, 85, 90], waterTemp);
-  renderConditionIcons(condition);
-  renderClock(high);
+  renderTideProgress(day, high);
 
   bestWindow.textContent = `Best window: ${windowLabel(high)}`;
   highTide.textContent = high ? `High tide: ${formatTime(high.time)} • ${formatNumber(high.height, 1)} ft` : "High tide: --";
@@ -368,9 +359,6 @@ async function loadVisual() {
   } catch (error) {
     title.textContent = "Unable to load visual";
     subtitle.textContent = error.message;
-    marineLabel.textContent = "Offline";
-    marineNote.textContent = "The single-day visual could not reach the fishing API.";
-    marineBar.style.background = "#f4510b";
   }
 }
 
